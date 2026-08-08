@@ -267,8 +267,11 @@ def _aggregate_oee_weekly(oee_raw: pd.DataFrame) -> pd.DataFrame:
             )
         else:
             weighted_avg = group["OEE_Score"].mean()
+            # group.name chứa giá trị key của groupby (week_start) vì
+            # include_groups=False loại cột groupby khỏi DataFrame con.
+            week_label = group.name.date() if hasattr(group.name, "date") else group.name
             logger.warning(
-                f"[OEE] Tuần {group['week_start'].iloc[0].date()}: "
+                f"[OEE] Tuần {week_label}: "
                 f"tổng RealQty = 0, fallback về mean() đơn giản."
             )
 
