@@ -1,0 +1,16 @@
+# Phương án 3-A — Dependencies
+# Tầng 1: Khai thác dữ liệu từ SQL Server
+pandas>=2.0
+pyodbc>=5.0
+
+# Tầng 3: Kinh tế lượng & kiểm định thống kê
+statsmodels>=0.14
+scipy>=1.11
+
+# Tầng 4: Deep Learning (LSTM)
+torch>=2.0
+scikit-learn>=1.3
+
+# Tiện ích
+numpy>=1.24
+matplotlib>=3.7
