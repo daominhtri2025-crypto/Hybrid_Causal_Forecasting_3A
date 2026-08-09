@@ -1,0 +1,252 @@
+{
+  "metadata": {
+    "script": "phase2_granger_causality.py",
+    "timestamp": "2026-08-08T22:50:24.351278",
+    "input_file": "data/processed/causal_weekly_dataset.csv",
+    "phase1_file": "reports/phase1_stationarity.json",
+    "n_observations_raw": 10,
+    "n_observations_after_diff": 9,
+    "significance_level": 0.05,
+    "d_values_from_phase1": {
+      "OEE_Score": 1,
+      "DelayRate": 0,
+      "Revenue": 0,
+      "OrderVolume": 0
+    },
+    "method": "Granger causality (F-test) on differenced series"
+  },
+  "lag_selection": {
+    "selected_lag": 1,
+    "criterion_used": "default (lag selection failed)",
+    "error": "maxlags is too large for the number of observations and the number of equations. The largest model cannot be estimated."
+  },
+  "pairwise_results": [
+    {
+      "cause": "OEE_Score",
+      "effect": "DelayRate",
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 1.114387705570622,
+          "p_value": 0.3394447405805192,
+          "df_numerator": 1,
+          "df_denominator": 5,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.3394447405805192,
+      "significant": false,
+      "conclusion": "OEE_Score KHÔNG Granger-cause DelayRate (p_min=0.3394)"
+    },
+    {
+      "cause": "OEE_Score",
+      "effect": "Revenue",
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 7.780730962744541e-05,
+          "p_value": 0.9933032005339044,
+          "df_numerator": 1,
+          "df_denominator": 5,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.9933032005339044,
+      "significant": false,
+      "conclusion": "OEE_Score KHÔNG Granger-cause Revenue (p_min=0.9933)"
+    },
+    {
+      "cause": "OEE_Score",
+      "effect": "OrderVolume",
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 0.526277583951431,
+          "p_value": 0.5006951966795803,
+          "df_numerator": 1,
+          "df_denominator": 5,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.5006951966795803,
+      "significant": false,
+      "conclusion": "OEE_Score KHÔNG Granger-cause OrderVolume (p_min=0.5007)"
+    },
+    {
+      "cause": "DelayRate",
+      "effect": "OEE_Score",
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 2.702768872087718,
+          "p_value": 0.16109483183787443,
+          "df_numerator": 1,
+          "df_denominator": 5,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.16109483183787443,
+      "significant": false,
+      "conclusion": "DelayRate KHÔNG Granger-cause OEE_Score (p_min=0.1611)"
+    },
+    {
+      "cause": "DelayRate",
+      "effect": "Revenue",
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 3.1177648559395834,
+          "p_value": 0.13770489365299488,
+          "df_numerator": 1,
+          "df_denominator": 5,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.13770489365299488,
+      "significant": false,
+      "conclusion": "DelayRate KHÔNG Granger-cause Revenue (p_min=0.1377)"
+    },
+    {
+      "cause": "DelayRate",
+      "effect": "OrderVolume",
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 2.075471698113206,
+          "p_value": 0.20923908878888323,
+          "df_numerator": 1,
+          "df_denominator": 5,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.20923908878888323,
+      "significant": false,
+      "conclusion": "DelayRate KHÔNG Granger-cause OrderVolume (p_min=0.2092)"
+    },
+    {
+      "cause": "Revenue",
+      "effect": "OEE_Score",
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 0.04511375932719843,
+          "p_value": 0.8401824744777149,
+          "df_numerator": 1,
+          "df_denominator": 5,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.8401824744777149,
+      "significant": false,
+      "conclusion": "Revenue KHÔNG Granger-cause OEE_Score (p_min=0.8402)"
+    },
+    {
+      "cause": "Revenue",
+      "effect": "DelayRate",
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 0.5561509844921033,
+          "p_value": 0.48936877042749904,
+          "df_numerator": 1,
+          "df_denominator": 5,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.48936877042749904,
+      "significant": false,
+      "conclusion": "Revenue KHÔNG Granger-cause DelayRate (p_min=0.4894)"
+    },
+    {
+      "cause": "Revenue",
+      "effect": "OrderVolume",
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 0.8763667861878994,
+          "p_value": 0.3921744740889462,
+          "df_numerator": 1,
+          "df_denominator": 5,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.3921744740889462,
+      "significant": false,
+      "conclusion": "Revenue KHÔNG Granger-cause OrderVolume (p_min=0.3922)"
+    },
+    {
+      "cause": "OrderVolume",
+      "effect": "OEE_Score",
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 0.16832885964179228,
+          "p_value": 0.6985899125185754,
+          "df_numerator": 1,
+          "df_denominator": 5,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.6985899125185754,
+      "significant": false,
+      "conclusion": "OrderVolume KHÔNG Granger-cause OEE_Score (p_min=0.6986)"
+    },
+    {
+      "cause": "OrderVolume",
+      "effect": "DelayRate",
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 0.26573559150657083,
+          "p_value": 0.6281816370768104,
+          "df_numerator": 1,
+          "df_denominator": 5,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.6281816370768104,
+      "significant": false,
+      "conclusion": "OrderVolume KHÔNG Granger-cause DelayRate (p_min=0.6282)"
+    },
+    {
+      "cause": "OrderVolume",
+      "effect": "Revenue",
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 0.8171441232555241,
+          "p_value": 0.4074584090969954,
+          "df_numerator": 1,
+          "df_denominator": 5,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.4074584090969954,
+      "significant": false,
+      "conclusion": "OrderVolume KHÔNG Granger-cause Revenue (p_min=0.4075)"
+    }
+  ],
+  "summary": {
+    "total_pairs_tested": 12,
+    "significant_pairs": 0,
+    "significant_list": []
+  },
+  "sensitivity_analysis": {
+    "description": "Không đủ dữ liệu sạch để chạy sensitivity analysis.",
+    "n_observations_clean": 6,
+    "n_after_diff": 5,
+    "discrepancies": []
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "metadata": {
+    "script": "phase3_cointegration.py",
+    "timestamp": "2026-08-08T22:50:24.360183",
+    "input_file": "data/processed/causal_weekly_dataset.csv",
+    "phase1_file": "reports/phase1_stationarity.json",
+    "n_observations": 10,
+    "significance_level": 0.05,
+    "d_values_from_phase1": {
+      "OEE_Score": 1,
+      "DelayRate": 0,
+      "Revenue": 0,
+      "OrderVolume": 0
+    },
+    "d_max": 1,
+    "method": "Johansen cointegration (Trace + Max-Eigenvalue)",
+    "det_order": 1,
+    "det_order_description": "Unrestricted constant (no trend) — Lütkepohl 2005",
+    "applicability": "insufficient_i1"
+  },
+  "lag_selection": {
+    "selected_lag": 1,
+    "error": "maxlags is too large for the number of observations and the number of equations. The largest model cannot be estimated."
+  },
+  "johansen_result": {
+    "trace_test": {
+      "rank": 2,
+      "details": [
+        {
+          "h0": "r ≤ 0",
+          "statistic": 68.74029076825319,
+          "critical_values": {
+            "90%": 51.6492,
+            "95%": 55.2459,
+            "99%": 62.5202
+          },
+          "reject_h0_at_5pct": true
+        },
+        {
+          "h0": "r ≤ 1",
+          "statistic": 37.10363244586883,
+          "critical_values": {
+            "90%": 32.0645,
+            "95%": 35.0116,
+            "99%": 41.0815
+          },
+          "reject_h0_at_5pct": true
+        },
+        {
+          "h0": "r ≤ 2",
+          "statistic": 13.941405358869538,
+          "critical_values": {
+            "90%": 16.1619,
+            "95%": 18.3985,
+            "99%": 23.1485
+          },
+          "reject_h0_at_5pct": false
+        }
+      ]
+    },
+    "max_eigenvalue_test": {
+      "rank": 1,
+      "details": [
+        {
+          "h0": "r = 0",
+          "statistic": 31.636658322384363,
+          "critical_values": {
+            "90%": 28.2398,
+            "95%": 30.8151,
+            "99%": 36.193
+          },
+          "reject_h0_at_5pct": true
+        },
+        {
+          "h0": "r = 1",
+          "statistic": 23.162227086999295,
+          "critical_values": {
+            "90%": 21.8731,
+            "95%": 24.2522,
+            "99%": 29.2631
+          },
+          "reject_h0_at_5pct": false
+        }
+      ]
+    },
+    "eigenvalues": [
+      0.9702576778128964,
+      0.9237380220104654,
+      0.6568662914638808,
+      0.38085138911210636
+    ],
+    "rank_agreement": "inconsistent",
+    "coint_rank": 2,
+    "n_variables": 4,
+    "variable_names": [
+      "OEE_Score",
+      "DelayRate",
+      "Revenue",
+      "OrderVolume"
+    ],
+    "route": "VECM",
+    "route_explanation": "0 < r = 2 < n = 4: có 2 vector đồng tích hợp → dùng VECM (Vector Error Correction Model) với 2 error correction term(s).",
+    "det_order": 1,
+    "k_ar_diff": 0
+  },
+  "coint_rank": 2,
+  "route": "VECM",
+  "route_explanation": "0 < r = 2 < n = 4: có 2 vector đồng tích hợp → dùng VECM (Vector Error Correction Model) với 2 error correction term(s).",
+  "sensitivity_analysis": {
+    "description": "Không đủ dữ liệu sạch cho Johansen sensitivity.",
+    "n_observations_clean": 6,
+    "discrepancies": []
+  }
+}
