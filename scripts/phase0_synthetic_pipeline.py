@@ -364,8 +364,8 @@ class CausalDatasetBuilder:
         planned_col_name = planned_col
 
         actual_candidates = [
-            "ShipmentDate", "Shipment Date", "Shipment_Date",
-            "ActualEndDate", "Actual End Date",
+            "ActualShipDate", "ShipmentDate", "Shipment Date",
+            "Shipment_Date", "ActualEndDate", "Actual End Date",
         ]
         planned_candidates = [
             "RequestedDeliveryDate", "Requested Delivery Date",
