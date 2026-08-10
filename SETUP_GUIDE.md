@@ -94,6 +94,32 @@ Nếu chưa có, tạo bằng lệnh:
 mkdir -p data/raw data/processed reports/logs
 ```
 
+### 3.3. Tiền điều kiện: 3 bảng nguồn phải đã tồn tại trong CSDL
+
+> **Quan trọng:** `cmt_oee_results`, `cmt_delay_results`, `fob_revenue`
+> **KHÔNG phải bảng gốc** của hệ thống ERP — đây là **kết quả trích xuất**
+> do pipeline riêng của Phương án A tạo ra và ghi vào `qtdn_datamining`.
+> Tầng 1 (`tang1_db_extractor.py`) chỉ **đọc** 3 bảng này bằng `SELECT * ...`
+> — nó không tự tính toán hay JOIN từ dữ liệu ERP gốc (đúng ranh giới kiến
+> trúc ở CLAUDE.md mục 4: Tầng 1 không được trùng lặp logic của Phương án A).
+>
+> **Trước khi chạy Tầng 1, phải xác nhận:** pipeline trích xuất của Phương
+> án A đã chạy xong trên CSDL đang trỏ tới, và 3 bảng trên đã có dữ liệu.
+> Nếu chưa, script sẽ báo lỗi `Invalid object name 'cmt_oee_results'` (xem
+> mục 6 — Troubleshooting).
+>
+> Kiểm tra nhanh bằng SQL trước khi chạy Tầng 1:
+>
+> ```sql
+> SELECT COUNT(*) FROM cmt_oee_results;
+> SELECT COUNT(*) FROM cmt_delay_results;
+> SELECT COUNT(*) FROM fob_revenue;
+> ```
+>
+> Nếu bất kỳ truy vấn nào báo lỗi "Invalid object name", liên hệ đội phụ
+> trách Phương án A để chạy pipeline trích xuất trước — Phương án 3 **không**
+> được tự tạo/tính lại 3 bảng này (CLAUDE.md mục 4).
+
 ---
 
 ## 4. Vận hành (Execution)
@@ -107,7 +133,9 @@ Chạy tuần tự từ Tầng 1 đến Tầng 4. Mỗi tầng đọc output c�
 python scripts/tang1_db_extractor.py
 ```
 
-- Kết nối SQL Server, trích xuất 3 bảng (`cmt_oee_results`, `cmt_delay_results`, `fob_revenue`)
+> Yêu cầu: 3 bảng nguồn đã tồn tại trong CSDL — xem mục 3.3 trước khi chạy.
+
+- Kết nối SQL Server, trích xuất 3 bảng (`cmt_oee_results`, `cmt_delay_results`, `fob_revenue`) — đây là bảng đã được Phương án A trích xuất sẵn, không phải bảng ERP gốc
 - Tính Jaccard Index kiểm tra overlap OrderNo giữa các bảng
 - Tính SHA-256 checksum cho từng file đầu ra
 - Ghi snapshot bất biến vào `data/raw/snapshot_YYYYMMDD_HHMM/`
@@ -199,6 +227,7 @@ wc -l data/processed/causal_weekly_dataset.csv
 | `[IM002] Data source name not found` | Thiếu ODBC Driver | Cài ODBC Driver 17 for SQL Server |
 | `FileNotFoundError: reports/phase1_*.json` | Chạy sai thứ tự | Chạy lại từ Tầng 1, tuần tự |
 | `Connection timeout` | SQL Server không truy cập được | Kiểm tra firewall, IP, tên instance |
+| `Invalid object name 'cmt_oee_results'` (hoặc `cmt_delay_results`/`fob_revenue`) | Pipeline trích xuất của Phương án A chưa chạy trên CSDL này — 3 bảng chưa tồn tại | Liên hệ đội Phương án A chạy pipeline trích xuất trước; xem mục 3.3. Tầng 1 chỉ đọc, không tự tạo bảng |
 
 ---
 
