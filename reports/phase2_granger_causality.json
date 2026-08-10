@@ -1,16 +1,16 @@
 {
   "metadata": {
     "script": "phase2_granger_causality.py",
-    "timestamp": "2026-08-08T22:50:24.351278",
+    "timestamp": "2026-08-10T16:17:12.594276",
     "input_file": "data/processed/causal_weekly_dataset.csv",
     "phase1_file": "reports/phase1_stationarity.json",
-    "n_observations_raw": 10,
-    "n_observations_after_diff": 9,
+    "n_observations_raw": 375,
+    "n_observations_after_diff": 374,
     "significance_level": 0.05,
     "d_values_from_phase1": {
       "OEE_Score": 1,
-      "DelayRate": 0,
-      "Revenue": 0,
+      "DelayRate": 1,
+      "Revenue": 1,
       "OrderVolume": 0
     },
     "method": "Granger causality (F-test) on differenced series"
@@ -27,17 +27,17 @@
       "skipped": false,
       "lag_results": {
         "1": {
-          "f_statistic": 1.114387705570622,
-          "p_value": 0.3394447405805192,
+          "f_statistic": 3.03480237695209,
+          "p_value": 0.08232743156004288,
           "df_numerator": 1,
-          "df_denominator": 5,
+          "df_denominator": 370,
           "significant": false
         }
       },
       "best_lag": 1,
-      "best_p_value": 0.3394447405805192,
+      "best_p_value": 0.08232743156004288,
       "significant": false,
-      "conclusion": "OEE_Score KHÔNG Granger-cause DelayRate (p_min=0.3394)"
+      "conclusion": "OEE_Score KHÔNG Granger-cause DelayRate (p_min=0.0823)"
     },
     {
       "cause": "OEE_Score",
@@ -45,17 +45,17 @@
       "skipped": false,
       "lag_results": {
         "1": {
-          "f_statistic": 7.780730962744541e-05,
-          "p_value": 0.9933032005339044,
+          "f_statistic": 0.11092710055062444,
+          "p_value": 0.7392797441455448,
           "df_numerator": 1,
-          "df_denominator": 5,
+          "df_denominator": 370,
           "significant": false
         }
       },
       "best_lag": 1,
-      "best_p_value": 0.9933032005339044,
+      "best_p_value": 0.7392797441455448,
       "significant": false,
-      "conclusion": "OEE_Score KHÔNG Granger-cause Revenue (p_min=0.9933)"
+      "conclusion": "OEE_Score KHÔNG Granger-cause Revenue (p_min=0.7393)"
     },
     {
       "cause": "OEE_Score",
@@ -63,17 +63,17 @@
       "skipped": false,
       "lag_results": {
         "1": {
-          "f_statistic": 0.526277583951431,
-          "p_value": 0.5006951966795803,
+          "f_statistic": 1.920865043676683,
+          "p_value": 0.1665960479976151,
           "df_numerator": 1,
-          "df_denominator": 5,
+          "df_denominator": 370,
           "significant": false
         }
       },
       "best_lag": 1,
-      "best_p_value": 0.5006951966795803,
+      "best_p_value": 0.1665960479976151,
       "significant": false,
-      "conclusion": "OEE_Score KHÔNG Granger-cause OrderVolume (p_min=0.5007)"
+      "conclusion": "OEE_Score KHÔNG Granger-cause OrderVolume (p_min=0.1666)"
     },
     {
       "cause": "DelayRate",
@@ -81,17 +81,17 @@
       "skipped": false,
       "lag_results": {
         "1": {
-          "f_statistic": 2.702768872087718,
-          "p_value": 0.16109483183787443,
+          "f_statistic": 9.08763078812308,
+          "p_value": 0.0027509162028879204,
           "df_numerator": 1,
-          "df_denominator": 5,
-          "significant": false
+          "df_denominator": 370,
+          "significant": true
         }
       },
       "best_lag": 1,
-      "best_p_value": 0.16109483183787443,
-      "significant": false,
-      "conclusion": "DelayRate KHÔNG Granger-cause OEE_Score (p_min=0.1611)"
+      "best_p_value": 0.0027509162028879204,
+      "significant": true,
+      "conclusion": "DelayRate Granger-cause OEE_Score tại lag=1 (p=0.0028)"
     },
     {
       "cause": "DelayRate",
@@ -99,17 +99,17 @@
       "skipped": false,
       "lag_results": {
         "1": {
-          "f_statistic": 3.1177648559395834,
-          "p_value": 0.13770489365299488,
+          "f_statistic": 3.794455709827329,
+          "p_value": 0.052178467249518884,
           "df_numerator": 1,
-          "df_denominator": 5,
+          "df_denominator": 370,
           "significant": false
         }
       },
       "best_lag": 1,
-      "best_p_value": 0.13770489365299488,
+      "best_p_value": 0.052178467249518884,
       "significant": false,
-      "conclusion": "DelayRate KHÔNG Granger-cause Revenue (p_min=0.1377)"
+      "conclusion": "DelayRate KHÔNG Granger-cause Revenue (p_min=0.0522)"
     },
     {
       "cause": "DelayRate",
@@ -117,17 +117,17 @@
       "skipped": false,
       "lag_results": {
         "1": {
-          "f_statistic": 2.075471698113206,
-          "p_value": 0.20923908878888323,
+          "f_statistic": 0.21085871273185963,
+          "p_value": 0.6463648373777358,
           "df_numerator": 1,
-          "df_denominator": 5,
+          "df_denominator": 370,
           "significant": false
         }
       },
       "best_lag": 1,
-      "best_p_value": 0.20923908878888323,
+      "best_p_value": 0.6463648373777358,
       "significant": false,
-      "conclusion": "DelayRate KHÔNG Granger-cause OrderVolume (p_min=0.2092)"
+      "conclusion": "DelayRate KHÔNG Granger-cause OrderVolume (p_min=0.6464)"
     },
     {
       "cause": "Revenue",
@@ -135,17 +135,17 @@
       "skipped": false,
       "lag_results": {
         "1": {
-          "f_statistic": 0.04511375932719843,
-          "p_value": 0.8401824744777149,
+          "f_statistic": 0.03678619909544983,
+          "p_value": 0.8480062099428467,
           "df_numerator": 1,
-          "df_denominator": 5,
+          "df_denominator": 370,
           "significant": false
         }
       },
       "best_lag": 1,
-      "best_p_value": 0.8401824744777149,
+      "best_p_value": 0.8480062099428467,
       "significant": false,
-      "conclusion": "Revenue KHÔNG Granger-cause OEE_Score (p_min=0.8402)"
+      "conclusion": "Revenue KHÔNG Granger-cause OEE_Score (p_min=0.8480)"
     },
     {
       "cause": "Revenue",
@@ -153,17 +153,17 @@
       "skipped": false,
       "lag_results": {
         "1": {
-          "f_statistic": 0.5561509844921033,
-          "p_value": 0.48936877042749904,
+          "f_statistic": 2.710499744331548e-05,
+          "p_value": 0.995848841292098,
           "df_numerator": 1,
-          "df_denominator": 5,
+          "df_denominator": 370,
           "significant": false
         }
       },
       "best_lag": 1,
-      "best_p_value": 0.48936877042749904,
+      "best_p_value": 0.995848841292098,
       "significant": false,
-      "conclusion": "Revenue KHÔNG Granger-cause DelayRate (p_min=0.4894)"
+      "conclusion": "Revenue KHÔNG Granger-cause DelayRate (p_min=0.9958)"
     },
     {
       "cause": "Revenue",
@@ -171,17 +171,17 @@
       "skipped": false,
       "lag_results": {
         "1": {
-          "f_statistic": 0.8763667861878994,
-          "p_value": 0.3921744740889462,
+          "f_statistic": 1.35070542616544,
+          "p_value": 0.24590393131150437,
           "df_numerator": 1,
-          "df_denominator": 5,
+          "df_denominator": 370,
           "significant": false
         }
       },
       "best_lag": 1,
-      "best_p_value": 0.3921744740889462,
+      "best_p_value": 0.24590393131150437,
       "significant": false,
-      "conclusion": "Revenue KHÔNG Granger-cause OrderVolume (p_min=0.3922)"
+      "conclusion": "Revenue KHÔNG Granger-cause OrderVolume (p_min=0.2459)"
     },
     {
       "cause": "OrderVolume",
@@ -189,17 +189,17 @@
       "skipped": false,
       "lag_results": {
         "1": {
-          "f_statistic": 0.16832885964179228,
-          "p_value": 0.6985899125185754,
+          "f_statistic": 7.07981757872197,
+          "p_value": 0.008135146362442357,
           "df_numerator": 1,
-          "df_denominator": 5,
-          "significant": false
+          "df_denominator": 370,
+          "significant": true
         }
       },
       "best_lag": 1,
-      "best_p_value": 0.6985899125185754,
-      "significant": false,
-      "conclusion": "OrderVolume KHÔNG Granger-cause OEE_Score (p_min=0.6986)"
+      "best_p_value": 0.008135146362442357,
+      "significant": true,
+      "conclusion": "OrderVolume Granger-cause OEE_Score tại lag=1 (p=0.0081)"
     },
     {
       "cause": "OrderVolume",
@@ -207,17 +207,17 @@
       "skipped": false,
       "lag_results": {
         "1": {
-          "f_statistic": 0.26573559150657083,
-          "p_value": 0.6281816370768104,
+          "f_statistic": 0.0096834204742637,
+          "p_value": 0.92166449070078,
           "df_numerator": 1,
-          "df_denominator": 5,
+          "df_denominator": 370,
           "significant": false
         }
       },
       "best_lag": 1,
-      "best_p_value": 0.6281816370768104,
+      "best_p_value": 0.92166449070078,
       "significant": false,
-      "conclusion": "OrderVolume KHÔNG Granger-cause DelayRate (p_min=0.6282)"
+      "conclusion": "OrderVolume KHÔNG Granger-cause DelayRate (p_min=0.9217)"
     },
     {
       "cause": "OrderVolume",
@@ -225,28 +225,29 @@
       "skipped": false,
       "lag_results": {
         "1": {
-          "f_statistic": 0.8171441232555241,
-          "p_value": 0.4074584090969954,
+          "f_statistic": 0.0012821857552303801,
+          "p_value": 0.9714550660126237,
           "df_numerator": 1,
-          "df_denominator": 5,
+          "df_denominator": 370,
           "significant": false
         }
       },
       "best_lag": 1,
-      "best_p_value": 0.4074584090969954,
+      "best_p_value": 0.9714550660126237,
       "significant": false,
-      "conclusion": "OrderVolume KHÔNG Granger-cause Revenue (p_min=0.4075)"
+      "conclusion": "OrderVolume KHÔNG Granger-cause Revenue (p_min=0.9715)"
     }
   ],
   "summary": {
     "total_pairs_tested": 12,
-    "significant_pairs": 0,
-    "significant_list": []
+    "significant_pairs": 2,
+    "significant_list": [
+      "DelayRate → OEE_Score",
+      "OrderVolume → OEE_Score"
+    ]
   },
   "sensitivity_analysis": {
-    "description": "Không đủ dữ liệu sạch để chạy sensitivity analysis.",
-    "n_observations_clean": 6,
-    "n_after_diff": 5,
+    "description": "Không có tuần nội suy — kết quả giống hoàn toàn.",
     "discrepancies": []
   }
 }

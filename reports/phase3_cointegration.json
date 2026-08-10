@@ -1,22 +1,22 @@
 {
   "metadata": {
     "script": "phase3_cointegration.py",
-    "timestamp": "2026-08-08T22:50:24.360183",
+    "timestamp": "2026-08-10T16:17:41.889415",
     "input_file": "data/processed/causal_weekly_dataset.csv",
     "phase1_file": "reports/phase1_stationarity.json",
-    "n_observations": 10,
+    "n_observations": 375,
     "significance_level": 0.05,
     "d_values_from_phase1": {
       "OEE_Score": 1,
-      "DelayRate": 0,
-      "Revenue": 0,
+      "DelayRate": 1,
+      "Revenue": 1,
       "OrderVolume": 0
     },
     "d_max": 1,
     "method": "Johansen cointegration (Trace + Max-Eigenvalue)",
     "det_order": 1,
     "det_order_description": "Unrestricted constant (no trend) — Lütkepohl 2005",
-    "applicability": "insufficient_i1"
+    "applicability": "applicable"
   },
   "lag_selection": {
     "selected_lag": 1,
@@ -28,7 +28,7 @@
       "details": [
         {
           "h0": "r ≤ 0",
-          "statistic": 68.74029076825319,
+          "statistic": 496.8578819337417,
           "critical_values": {
             "90%": 51.6492,
             "95%": 55.2459,
@@ -38,7 +38,7 @@
         },
         {
           "h0": "r ≤ 1",
-          "statistic": 37.10363244586883,
+          "statistic": 192.8780889525959,
           "critical_values": {
             "90%": 32.0645,
             "95%": 35.0116,
@@ -48,7 +48,7 @@
         },
         {
           "h0": "r ≤ 2",
-          "statistic": 13.941405358869538,
+          "statistic": 18.314452950748958,
           "critical_values": {
             "90%": 16.1619,
             "95%": 18.3985,
@@ -59,11 +59,11 @@
       ]
     },
     "max_eigenvalue_test": {
-      "rank": 1,
+      "rank": 2,
       "details": [
         {
           "h0": "r = 0",
-          "statistic": 31.636658322384363,
+          "statistic": 303.97979298114575,
           "critical_values": {
             "90%": 28.2398,
             "95%": 30.8151,
@@ -73,23 +73,33 @@
         },
         {
           "h0": "r = 1",
-          "statistic": 23.162227086999295,
+          "statistic": 174.56363600184696,
           "critical_values": {
             "90%": 21.8731,
             "95%": 24.2522,
             "99%": 29.2631
+          },
+          "reject_h0_at_5pct": true
+        },
+        {
+          "h0": "r = 2",
+          "statistic": 16.90329470912832,
+          "critical_values": {
+            "90%": 15.0006,
+            "95%": 17.1481,
+            "99%": 21.7465
           },
           "reject_h0_at_5pct": false
         }
       ]
     },
     "eigenvalues": [
-      0.9702576778128964,
-      0.9237380220104654,
-      0.6568662914638808,
-      0.38085138911210636
+      0.5563770083396304,
+      0.37296172141913625,
+      0.04418985156759683,
+      0.003766040991181627
     ],
-    "rank_agreement": "inconsistent",
+    "rank_agreement": "consistent",
     "coint_rank": 2,
     "n_variables": 4,
     "variable_names": [
@@ -107,8 +117,7 @@
   "route": "VECM",
   "route_explanation": "0 < r = 2 < n = 4: có 2 vector đồng tích hợp → dùng VECM (Vector Error Correction Model) với 2 error correction term(s).",
   "sensitivity_analysis": {
-    "description": "Không đủ dữ liệu sạch cho Johansen sensitivity.",
-    "n_observations_clean": 6,
+    "description": "Không có tuần nội suy — kết quả giống hoàn toàn.",
     "discrepancies": []
   }
 }
