@@ -2,18 +2,19 @@
 Tầng 1 — DB Layer: Khai thác dữ liệu gốc từ SQL Server.
 
 Mục đích:
-    Trích xuất 3 bảng dữ liệu (`cmt_oee_results`, `cmt_delay_results`,
-    `fob_revenue`) từ database `qtdn_datamining` trên SQL Server, đảm bảo cả
-    3 truy vấn phản ánh CÙNG MỘT lát cắt thời gian (snapshot) — tránh lệch
-    OrderNo giữa các file do đơn hàng phát sinh giữa các lần truy vấn.
+    Kết nối trực tiếp vào database ERP (`qtdn_datamining`) trên SQL Server,
+    trích xuất và TÍNH TOÁN 3 bảng phân tích (`cmt_oee_results`,
+    `cmt_delay_results`, `fob_revenue`) từ 3 bảng ERP gốc (`WorkOrders`,
+    `SalesOrders`, `Invoices`). Cả 3 truy vấn dùng chung một mốc thời gian
+    `snapshot_time` để đảm bảo tính nhất quán dữ liệu.
 
 Thiết kế (theo ARCHITECTURE_4_tang.md, Tầng 1):
     1. Mở 1 kết nối SQL Server duy nhất, chốt `snapshot_time` MỘT LẦN.
-    2. Chạy 3 truy vấn trong cùng session, mỗi truy vấn lọc theo
-       `WHERE <cột thời gian> <= @snapshot_time`.
-    3. Ghi NGUYÊN TRẠNG ra `data/raw/snapshot_YYYYMMDD_HHMM/*.csv` — KHÔNG
-       transform, KHÔNG đổi tên cột (tuân thủ nguyên tắc bất biến, CLAUDE.md
-       mục 2).
+    2. Chạy 3 truy vấn SQL tính toán OEE_Score, IsDelayed, Revenue — mỗi
+       truy vấn lọc theo `WHERE <cột thời gian> <= @snapshot_time`.
+    3. Ghi NGUYÊN TRẠNG kết quả ra `data/raw/snapshot_YYYYMMDD_HHMM/*.csv`
+       — KHÔNG transform thêm sau khi đã truy vấn (tuân thủ nguyên tắc bất
+       biến, CLAUDE.md mục 2).
     4. Tự động cập nhật `data/raw/MANIFEST.md`: timestamp, checksum SHA-256,
        số dòng mỗi file, tỉ lệ khớp OrderNo giữa 3 file.
 
@@ -23,8 +24,18 @@ Output: `data/raw/snapshot_YYYYMMDD_HHMM/{cmt_oee_results.csv,
         cmt_delay_results.csv, fob_revenue.csv}` + `data/raw/MANIFEST.md`.
 Sở hữu: Role A — Data Engineering (skill.md).
 
-Thay đổi so với bản trước: Đây là bản rebuild hoàn toàn (Phương án 3-A),
-    không kế thừa code cũ.
+Bảng ERP gốc sử dụng:
+    - WorkOrders: dữ liệu lệnh sản xuất (OrderNo, PlanQty, ActualEndDate...)
+    - ProductionLogs: dữ liệu vận hành máy (PlannedOperatingMinutes,
+      ActualWorkingMinutes, TotalQty, GoodQty, StandardCycleTime) — JOIN
+      với WorkOrders qua OrderNo để tính OEE = A × P × Q
+    - SalesOrders: dữ liệu đơn hàng bán (PlannedShipmentDate, ActualShipDate...)
+    - Invoices: dữ liệu hóa đơn/doanh thu (FOBValue, ShipmentDate...)
+
+Thay đổi so với bản trước:
+    - Bản cũ: SELECT * FROM cmt_oee_results (giả định bảng đã tồn tại sẵn)
+    - Bản mới: Truy vấn trực tiếp từ bảng ERP gốc, TÍNH TOÁN OEE/Delay/Revenue
+      bằng SQL — không phụ thuộc pipeline Phương án A chạy trước.
 """
 
 import os
@@ -46,21 +57,25 @@ logger = get_logger("tang1")
 # CẤU HÌNH KẾT NỐI SQL SERVER
 # =====================================================================
 # Anh Béo điền thông tin kết nối thực tế tại đây trước khi chạy trên
-# máy local. Script này KHÔNG đọc từ biến môi trường ẩn — đảm bảo tái
-# lập được (reproducibility, CLAUDE.md mục 3.5).
+# máy local. Nếu muốn dùng biến môi trường, đặt:
+#   set DB_SERVER=192.168.1.100\SQLEXPRESS   (Windows)
+#   export DB_SERVER=192.168.1.100\\SQLEXPRESS (Linux/macOS)
+# Script ưu tiên đọc từ biến môi trường; nếu không có, dùng giá trị
+# mặc định (placeholder) bên dưới.
 # =====================================================================
 DB_CONFIG = {
-    "server": "localhost",          # Thay bằng tên/IP SQL Server thực tế
-    "database": "qtdn_datamining",
-    "driver": "{ODBC Driver 17 for SQL Server}",
-    # Nếu dùng Windows Authentication, để trống username/password
-    # và thêm "Trusted_Connection=yes" vào connection string.
-    "username": "",
-    "password": "",
-    "trusted_connection": True,     # True = Windows Auth, False = SQL Auth
+    "server": os.environ.get("DB_SERVER", "localhost"),
+    "database": os.environ.get("DB_DATABASE", "qtdn_datamining"),
+    "driver": os.environ.get("DB_DRIVER", "{ODBC Driver 17 for SQL Server}"),
+    "username": os.environ.get("DB_USERNAME", ""),
+    "password": os.environ.get("DB_PASSWORD", ""),
+    # True = Windows Authentication (không cần username/password)
+    # False = SQL Server Authentication (phải điền username/password)
+    "trusted_connection": os.environ.get("DB_TRUSTED", "true").lower() == "true",
 }
 
-# Số lần thử kết nối lại khi SQL Server không phản hồi
+# Số lần thử kết nối lại khi SQL Server không phản hồi — sau MAX_RETRY
+# lần đều thất bại, ghi CRITICAL và dừng pipeline (fail-fast).
 MAX_RETRY = 3
 
 
@@ -101,6 +116,10 @@ def _connect_sql_server() -> pyodbc.Connection:
     for attempt in range(1, MAX_RETRY + 1):
         try:
             logger.info(f"Đang kết nối SQL Server (lần thử {attempt}/{MAX_RETRY})...")
+            logger.info(
+                f"  Server: {DB_CONFIG['server']} | Database: {DB_CONFIG['database']} | "
+                f"Auth: {'Windows' if DB_CONFIG['trusted_connection'] else 'SQL Server'}"
+            )
             conn = pyodbc.connect(conn_str, timeout=30)
             logger.info("Kết nối SQL Server thành công.")
             return conn
@@ -114,7 +133,8 @@ def _connect_sql_server() -> pyodbc.Connection:
     # nghiêm trọng, không thể tiếp tục pipeline.
     logger.critical(
         f"Kết nối SQL Server thất bại sau {MAX_RETRY} lần thử. "
-        f"Kiểm tra lại cấu hình DB_CONFIG trong tang1_db_extractor.py."
+        f"Kiểm tra lại cấu hình DB_CONFIG trong tang1_db_extractor.py "
+        f"hoặc biến môi trường DB_SERVER, DB_DATABASE, DB_DRIVER."
     )
     raise ConnectionError(
         f"Không thể kết nối SQL Server sau {MAX_RETRY} lần thử."
@@ -122,7 +142,12 @@ def _connect_sql_server() -> pyodbc.Connection:
 
 
 def _compute_sha256(file_path: str) -> str:
-    """Tính checksum SHA-256 cho file — dùng để ghi vào MANIFEST.md."""
+    """
+    Tính checksum SHA-256 cho file — dùng để ghi vào MANIFEST.md.
+
+    Đọc file theo chunk 8KB để xử lý được cả file lớn mà không
+    tiêu tốn RAM. Trả về chuỗi hex 64 ký tự.
+    """
     sha256 = hashlib.sha256()
     with open(file_path, "rb") as f:
         for chunk in iter(lambda: f.read(8192), b""):
@@ -132,15 +157,14 @@ def _compute_sha256(file_path: str) -> str:
 
 def _compute_orderno_overlap(dataframes: dict[str, pd.DataFrame]) -> dict:
     """
-    Tính tỉ lệ khớp OrderNo giữa 3 file.
+    Tính tỉ lệ khớp OrderNo giữa 3 file bằng Jaccard Index.
 
     Mục đích: phát hiện sớm lệch dữ liệu do snapshot không đồng thời
     (ARCHITECTURE_4_tang.md, Tầng 1, mục 4). Nếu tỉ lệ khớp < 95%,
     Tầng 1 ghi WARNING (CLAUDE.md mục 7.3).
 
-    Trả về dict chứa:
-        - sets: tập OrderNo của từng file (để debug nếu cần)
-        - overlap_ratio: tỉ lệ giao/hợp (Jaccard index) giữa 3 tập
+    Công thức Jaccard: J(A,B,C) = |A ∩ B ∩ C| / |A ∪ B ∪ C|
+    (xem MATH_AND_ALGORITHMS.md, Tầng 1, mục 1.1)
     """
     sets = {}
     for name, df in dataframes.items():
@@ -197,6 +221,7 @@ def _write_manifest(
         f"",
         f"- **Thời điểm trích xuất (snapshot_time):** {snapshot_time.isoformat()}",
         f"- **Thời điểm ghi file:** {datetime.now().isoformat()}",
+        f"- **Nguồn:** Truy vấn trực tiếp từ bảng ERP gốc (WorkOrders, ProductionLogs, SalesOrders, Invoices)",
         f"",
         f"### Danh sách file",
         f"",
@@ -246,31 +271,159 @@ def _write_manifest(
 
 
 # =====================================================================
-# CÁC TRUY VẤN SQL — GIỮ NGUYÊN TÊN CỘT GỐC TỪ DATABASE
+# CÁC TRUY VẤN SQL — TÍNH TOÁN TỪ BẢNG ERP GỐC
 # =====================================================================
-# Mỗi truy vấn lọc theo `<cột thời gian> <= @snapshot_time` để đảm bảo
-# cả 3 file phản ánh cùng một lát cắt thời gian (ARCHITECTURE, Tầng 1,
-# mục 2). Cột thời gian cụ thể phụ thuộc vào cấu trúc bảng trong
-# database qtdn_datamining — Anh Béo xác nhận/điều chỉnh tên cột nếu
-# cần trước khi chạy chính thức.
+# Mỗi truy vấn:
+#   1. Đọc dữ liệu từ bảng ERP gốc (WorkOrders, SalesOrders, Invoices)
+#   2. TÍNH TOÁN chỉ số phân tích (OEE_Score, IsDelayed, Revenue)
+#   3. Lọc theo `<cột thời gian> <= ?` (snapshot_time) để đảm bảo
+#      cả 3 file phản ánh cùng một lát cắt thời gian.
+#
+# Anh Béo cần xác nhận/điều chỉnh tên cột nếu schema thực tế khác
+# tên placeholder bên dưới (vd: PlanQty → PlannedQuantity).
 # =====================================================================
 
+# --- Truy vấn 1: OEE (Overall Equipment Effectiveness) ---
+# Tính từ bảng WorkOrders JOIN ProductionLogs — phân rã OEE theo tiêu chuẩn
+# quốc tế (Nakajima, 1988): OEE = Availability × Performance × Quality.
+#
+# Công thức phân rã (xem MATH_AND_ALGORITHMS.md mục 1.3):
+#   A (Availability)  = ActualWorkingMinutes / PlannedOperatingMinutes
+#   P (Performance)   = (TotalQty × StandardCycleTime) / ActualWorkingMinutes
+#   Q (Quality)       = GoodQty / TotalQty
+#   OEE_Score         = A × P × Q
+#
+# Nguồn dữ liệu:
+#   - WorkOrders: thông tin lệnh sản xuất (OrderNo, PlanQty, ActualEndDate...)
+#   - ProductionLogs: dữ liệu vận hành máy thực tế (thời gian chạy, sản lượng,
+#     chu kỳ chuẩn, sản phẩm đạt chất lượng)
+#
+# NULLIF(..., 0) tại mỗi phép chia — tránh division by zero; nếu mẫu số = 0
+# thì thành phần đó trả về NULL → OEE_Score tổng cũng NULL (ghi WARNING ở
+# hàm extract_snapshot).
+#
+# Chỉ lấy lệnh sản xuất đã hoàn thành (ActualEndDate IS NOT NULL) và nằm
+# trong khung thời gian snapshot (zero look-ahead bias).
+SQL_OEE = """
+    SELECT
+        wo.OrderNo,
+        wo.ProductCode,
+        wo.PlanQty,
+        wo.ActualStartDate,
+        wo.ActualEndDate,
+        wo.MachineLine,
+
+        -- Dữ liệu vận hành từ ProductionLogs
+        pl.PlannedOperatingMinutes,
+        pl.ActualWorkingMinutes,
+        pl.TotalQty,
+        pl.GoodQty,
+        pl.StandardCycleTime,
+
+        -- Availability: tỉ lệ thời gian máy chạy thực tế / kế hoạch
+        ROUND(
+            CAST(pl.ActualWorkingMinutes AS FLOAT)
+            / NULLIF(pl.PlannedOperatingMinutes, 0),
+            4
+        ) AS Availability,
+
+        -- Performance: tỉ lệ năng suất thực tế so với năng suất lý thuyết
+        ROUND(
+            (CAST(pl.TotalQty AS FLOAT) * pl.StandardCycleTime)
+            / NULLIF(pl.ActualWorkingMinutes, 0),
+            4
+        ) AS Performance,
+
+        -- Quality: tỉ lệ sản phẩm đạt chất lượng
+        ROUND(
+            CAST(pl.GoodQty AS FLOAT)
+            / NULLIF(pl.TotalQty, 0),
+            4
+        ) AS Quality,
+
+        -- OEE_Score = A × P × Q (tính đầy đủ 3 thành phần)
+        CASE
+            WHEN ISNULL(pl.PlannedOperatingMinutes, 0) = 0
+              OR ISNULL(pl.ActualWorkingMinutes, 0) = 0
+              OR ISNULL(pl.TotalQty, 0) = 0
+            THEN NULL
+            ELSE ROUND(
+                (CAST(pl.ActualWorkingMinutes AS FLOAT)
+                    / NULLIF(pl.PlannedOperatingMinutes, 0))
+              * ((CAST(pl.TotalQty AS FLOAT) * pl.StandardCycleTime)
+                    / NULLIF(pl.ActualWorkingMinutes, 0))
+              * (CAST(pl.GoodQty AS FLOAT)
+                    / NULLIF(pl.TotalQty, 0)),
+                4
+            )
+        END AS OEE_Score
+
+    FROM WorkOrders wo
+    INNER JOIN ProductionLogs pl
+        ON wo.OrderNo = pl.OrderNo
+    WHERE wo.ActualEndDate IS NOT NULL
+      AND wo.ActualEndDate <= ?
+    ORDER BY wo.ActualEndDate, wo.OrderNo
+"""
+
+# --- Truy vấn 2: Delay (Trễ đơn hàng) ---
+# Tính từ bảng SalesOrders — mỗi dòng là 1 đơn hàng bán.
+# IsDelayed = 1 nếu ngày giao thực tế (ActualShipDate) muộn hơn
+#             ngày kế hoạch (PlannedShipmentDate).
+# DelayDays = số ngày trễ (0 nếu giao đúng hoặc sớm hơn kế hoạch).
+# Dùng ActualShipDate (ngày giao thực tế) làm mốc thời gian snapshot
+# — KHÔNG dùng PlannedShipmentDate vì ngày kế hoạch có thể bị điều
+# chỉnh ngược (zero look-ahead bias, xem INNOVATIONS.md mục 4.3).
+SQL_DELAY = """
+    SELECT
+        so.OrderNo,
+        so.CustomerCode,
+        so.PlannedShipmentDate,
+        so.ActualShipDate,
+        CASE
+            WHEN so.ActualShipDate > so.PlannedShipmentDate THEN 1
+            ELSE 0
+        END AS IsDelayed,
+        CASE
+            WHEN so.ActualShipDate > so.PlannedShipmentDate
+                THEN DATEDIFF(DAY, so.PlannedShipmentDate, so.ActualShipDate)
+            ELSE 0
+        END AS DelayDays
+    FROM SalesOrders so
+    WHERE so.ActualShipDate IS NOT NULL
+      AND so.ActualShipDate <= ?
+    ORDER BY so.ActualShipDate, so.OrderNo
+"""
+
+# --- Truy vấn 3: FOB Revenue (Doanh thu xuất khẩu) ---
+# Tính từ bảng Invoices — mỗi dòng là 1 hóa đơn xuất khẩu.
+# Revenue = Quantity * UnitPrice (tổng giá trị FOB cho từng dòng).
+# TotalFOBValue là tổng giá trị đã có sẵn trong hóa đơn (nếu có),
+# nếu không thì tính từ Quantity * UnitPrice.
+# Dùng ShipmentDate làm mốc thời gian snapshot.
+SQL_REVENUE = """
+    SELECT
+        inv.OrderNo,
+        inv.InvoiceNo,
+        inv.CustomerCode,
+        inv.ShipmentDate,
+        inv.Quantity,
+        inv.UnitPrice,
+        ISNULL(
+            inv.TotalFOBValue,
+            ROUND(CAST(inv.Quantity AS FLOAT) * CAST(inv.UnitPrice AS FLOAT), 2)
+        ) AS Revenue
+    FROM Invoices inv
+    WHERE inv.ShipmentDate IS NOT NULL
+      AND inv.ShipmentDate <= ?
+    ORDER BY inv.ShipmentDate, inv.OrderNo
+"""
+
+# Ánh xạ tên bảng đầu ra → truy vấn SQL tương ứng
 QUERIES = {
-    "cmt_oee_results": """
-        SELECT *
-        FROM cmt_oee_results
-        WHERE ActualEndDate <= ?
-    """,
-    "cmt_delay_results": """
-        SELECT *
-        FROM cmt_delay_results
-        WHERE ActualEndDate <= ?
-    """,
-    "fob_revenue": """
-        SELECT *
-        FROM fob_revenue
-        WHERE ShipmentDate <= ?
-    """,
+    "cmt_oee_results": SQL_OEE,
+    "cmt_delay_results": SQL_DELAY,
+    "fob_revenue": SQL_REVENUE,
 }
 
 
@@ -280,9 +433,10 @@ def extract_snapshot() -> str:
 
     Quy trình:
         1. Chốt snapshot_time — MỘT LẦN duy nhất cho cả 3 truy vấn.
-        2. Kết nối SQL Server (có retry).
-        3. Chạy tuần tự 3 truy vấn, mỗi truy vấn lọc <= snapshot_time.
-        4. Ghi nguyên trạng ra CSV (KHÔNG transform — CLAUDE.md mục 2).
+        2. Kết nối SQL Server (có retry, tối đa MAX_RETRY lần).
+        3. Chạy tuần tự 3 truy vấn SQL tính toán OEE/Delay/Revenue từ bảng
+           ERP gốc, mỗi truy vấn lọc <= snapshot_time.
+        4. Ghi kết quả ra CSV (KHÔNG transform thêm — CLAUDE.md mục 2).
         5. Tính checksum SHA-256, tỉ lệ khớp OrderNo, cập nhật MANIFEST.md.
         6. Ghi log INFO/WARNING theo đúng quy ước (CLAUDE.md mục 7.3).
 
@@ -315,7 +469,9 @@ def extract_snapshot() -> str:
     logger.info(f"Thư mục snapshot: {snapshot_dir}")
 
     # -----------------------------------------------------------------
-    # Bước 2: Kết nối SQL Server
+    # Bước 2: Kết nối SQL Server — có cơ chế retry (MAX_RETRY lần).
+    # Nếu kết nối thất bại, hàm _connect_sql_server() tự raise
+    # ConnectionError kèm log CRITICAL — pipeline dừng ngay (fail-fast).
     # -----------------------------------------------------------------
     conn = _connect_sql_server()
 
@@ -324,45 +480,76 @@ def extract_snapshot() -> str:
         file_info_list: list[dict] = []
 
         # -----------------------------------------------------------------
-        # Bước 3: Chạy tuần tự 3 truy vấn — mỗi truy vấn dùng chung
-        # snapshot_time làm tham số lọc. Chạy tuần tự (không parallel) vì
-        # dùng chung 1 kết nối — đủ nhanh cho dataset quy mô này, và đơn
-        # giản hơn khi debug nếu có lỗi.
+        # Bước 3: Chạy tuần tự 3 truy vấn — mỗi truy vấn tính toán chỉ số
+        # phân tích từ bảng ERP gốc, dùng chung snapshot_time làm tham số
+        # lọc. Chạy tuần tự (không parallel) vì dùng chung 1 kết nối —
+        # đủ nhanh cho dataset quy mô này, và đơn giản hơn khi debug.
         # -----------------------------------------------------------------
         for table_name, query in QUERIES.items():
-            logger.info(f"Đang truy vấn bảng '{table_name}'...")
+            logger.info(f"Đang truy vấn và tính toán '{table_name}'...")
 
-            df = pd.read_sql(query, conn, params=[snapshot_time])
+            try:
+                df = pd.read_sql(query, conn, params=[snapshot_time])
+            except Exception:
+                # Bắt riêng lỗi từng truy vấn — ghi rõ TÊN BẢNG bị lỗi
+                # để dễ debug (vd: bảng gốc chưa tồn tại, sai tên cột...)
+                logger.exception(
+                    f"Truy vấn '{table_name}' thất bại — kiểm tra lại tên "
+                    f"bảng/cột trong SQL Server. Xem traceback bên dưới."
+                )
+                raise
+
             row_count = len(df)
+            col_count = len(df.columns)
 
             # Ghi INFO số dòng — bắt buộc theo CLAUDE.md mục 7.3
             logger.info(
                 f"Đã tải '{table_name}': {row_count:,} dòng, "
-                f"{len(df.columns)} cột."
+                f"{col_count} cột ({', '.join(df.columns.tolist())})."
             )
 
             # Ghi WARNING nếu bảng rỗng — bất thường nhưng chưa crash
             if row_count == 0:
                 logger.warning(
-                    f"Bảng '{table_name}' trả về 0 dòng — kiểm tra lại "
+                    f"Truy vấn '{table_name}' trả về 0 dòng — kiểm tra lại "
                     f"snapshot_time ({snapshot_time.isoformat()}) hoặc dữ "
-                    f"liệu trong database."
+                    f"liệu trong bảng ERP gốc tương ứng."
                 )
 
+            # Kiểm tra giá trị NULL ở các cột tính toán — ghi WARNING nếu
+            # có, vì NULL có thể do PlanQty = 0 (chia cho 0) hoặc dữ liệu
+            # thiếu ở bảng gốc.
+            computed_cols = {
+                "cmt_oee_results": "OEE_Score",
+                "cmt_delay_results": "IsDelayed",
+                "fob_revenue": "Revenue",
+            }
+            check_col = computed_cols.get(table_name)
+            if check_col and check_col in df.columns:
+                null_count = df[check_col].isna().sum()
+                if null_count > 0:
+                    logger.warning(
+                        f"Cột '{check_col}' trong '{table_name}': "
+                        f"{null_count:,} giá trị NULL (có thể do chia cho 0 "
+                        f"hoặc dữ liệu thiếu ở bảng ERP gốc)."
+                    )
+
             # ---------------------------------------------------------------
-            # Bước 4: Ghi nguyên trạng ra CSV — TUYỆT ĐỐI KHÔNG transform.
-            # Giữ nguyên tên cột gốc từ SQL Server, không đổi encoding,
-            # không lọc/sửa giá trị. Tuân thủ nguyên tắc bất biến dữ liệu
-            # (CLAUDE.md mục 2, điểm 1 và 3).
+            # Bước 4: Ghi nguyên trạng kết quả truy vấn ra CSV.
+            # Sau khi SQL đã tính toán xong OEE/Delay/Revenue, kết quả
+            # được ghi ra file KHÔNG qua bất kỳ transform nào thêm.
+            # Tuân thủ nguyên tắc bất biến dữ liệu (CLAUDE.md mục 2).
             # ---------------------------------------------------------------
             csv_filename = f"{table_name}.csv"
             csv_path = os.path.join(snapshot_dir, csv_filename)
             df.to_csv(csv_path, index=False, encoding="utf-8-sig")
 
-            logger.info(f"Đã ghi '{csv_filename}' ({row_count:,} dòng).")
+            logger.info(f"Đã ghi '{csv_filename}' ({row_count:,} dòng) vào {snapshot_dir}")
 
             # Tính checksum SHA-256 cho file vừa ghi — dùng cho MANIFEST.md
+            # và để kiểm tra tính toàn vẹn dữ liệu sau này.
             sha256 = _compute_sha256(csv_path)
+            logger.info(f"SHA-256 ({csv_filename}): {sha256[:16]}...")
 
             dataframes[table_name] = df
             file_info_list.append({
@@ -372,7 +559,8 @@ def extract_snapshot() -> str:
             })
 
         # -----------------------------------------------------------------
-        # Bước 5: Tính tỉ lệ khớp OrderNo và cập nhật MANIFEST.md
+        # Bước 5: Tính tỉ lệ khớp OrderNo (Jaccard Index) và cập nhật
+        # MANIFEST.md. Jaccard < 95% → WARNING (dấu hiệu dữ liệu lệch).
         # -----------------------------------------------------------------
         overlap_info = _compute_orderno_overlap(dataframes)
 
@@ -380,13 +568,11 @@ def extract_snapshot() -> str:
             ratio_pct = overlap_info["overlap_ratio"] * 100
             logger.info(f"Tỉ lệ khớp OrderNo (Jaccard): {ratio_pct:.2f}%")
 
-            # WARNING nếu tỉ lệ khớp < 95% — dấu hiệu snapshot không đồng
-            # thời hoặc dữ liệu bất thường (ARCHITECTURE, Tầng 1, mục 5).
             if overlap_info["overlap_ratio"] < 0.95:
                 logger.warning(
                     f"Tỉ lệ khớp OrderNo giữa các file = {ratio_pct:.2f}% "
                     f"(< 95%) — kiểm tra lại xem snapshot có đồng thời không, "
-                    f"hoặc có bảng nào thiếu dữ liệu OrderNo. "
+                    f"hoặc có bảng ERP gốc nào thiếu dữ liệu OrderNo. "
                     f"Chi tiết: giao={overlap_info['intersection_count']:,}, "
                     f"hợp={overlap_info['union_count']:,}."
                 )
@@ -399,11 +585,17 @@ def extract_snapshot() -> str:
         logger.exception("Tầng 1 gặp lỗi trong quá trình trích xuất dữ liệu.")
         raise
     finally:
+        # Luôn đóng kết nối khi xong — dù thành công hay thất bại.
         conn.close()
         logger.info("Đã đóng kết nối SQL Server.")
 
     elapsed = (datetime.now() - start_time).total_seconds()
     logger.info(f"Tầng 1 hoàn tất trong {elapsed:.1f}s. Snapshot: {snapshot_dir}")
+    logger.info(
+        f"Tóm tắt: {len(file_info_list)} file CSV đã ghi | "
+        f"Tổng {sum(f['row_count'] for f in file_info_list):,} dòng | "
+        f"Jaccard: {overlap_info.get('overlap_ratio', 'N/A')}"
+    )
 
     return snapshot_dir
 
@@ -417,6 +609,15 @@ if __name__ == "__main__":
     try:
         result_dir = extract_snapshot()
         logger.info(f"Kết quả snapshot lưu tại: {result_dir}")
+    except ConnectionError:
+        logger.critical(
+            "Không kết nối được SQL Server — kiểm tra lại:\n"
+            "  1. SQL Server đã bật và đang chạy?\n"
+            "  2. Tên server/IP trong DB_CONFIG (hoặc biến môi trường DB_SERVER) đúng chưa?\n"
+            "  3. ODBC Driver 17 đã cài chưa? (Xem SETUP_GUIDE.md mục 1)\n"
+            "  4. Firewall có chặn cổng 1433 không?"
+        )
+        sys.exit(1)
     except Exception:
         logger.exception("Tầng 1 thất bại — xem traceback ở trên.")
         sys.exit(1)

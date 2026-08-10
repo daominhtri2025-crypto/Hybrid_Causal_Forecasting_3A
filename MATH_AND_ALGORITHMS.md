@@ -38,7 +38,76 @@ $$
 > **Tính chất:** $J \in [0, 1]$; $J = 1$ khi 3 tập hoàn toàn trùng khớp;
 > $J = 0$ khi không có phần tử chung nào.
 
-### 1.2. SHA-256 — Chốt tính Toàn vẹn Dữ liệu
+### 1.2. OEE — Phân rã Hiệu suất Thiết bị Tổng thể (A × P × Q)
+
+Chỉ số OEE (Overall Equipment Effectiveness) được tính theo phương pháp phân rã
+3 thành phần chuẩn quốc tế (Nakajima, 1988):
+
+$$
+\text{OEE} = A \times P \times Q
+$$
+
+Trong đó:
+
+**Availability (Khả dụng máy)** — tỉ lệ thời gian máy vận hành thực tế so với
+kế hoạch, phản ánh tổn thất do dừng máy ngoài kế hoạch (downtime):
+
+$$
+A = \frac{\text{ActualWorkingMinutes}}{\text{PlannedOperatingMinutes}}
+$$
+
+**Performance (Hiệu năng)** — tỉ lệ năng suất thực tế so với năng suất lý thuyết,
+phản ánh tổn thất do chạy chậm (speed loss):
+
+$$
+P = \frac{\text{TotalQty} \times \text{StandardCycleTime}}{\text{ActualWorkingMinutes}}
+$$
+
+- $\text{TotalQty}$: tổng số sản phẩm sản xuất (bao gồm cả phế phẩm).
+- $\text{StandardCycleTime}$: thời gian chu kỳ chuẩn (phút/sản phẩm) theo thiết kế máy.
+- Tử số = thời gian lý thuyết cần để sản xuất $\text{TotalQty}$ sản phẩm ở tốc độ chuẩn.
+
+**Quality (Chất lượng)** — tỉ lệ sản phẩm đạt chất lượng, phản ánh tổn thất do
+phế phẩm (defect loss):
+
+$$
+Q = \frac{\text{GoodQty}}{\text{TotalQty}}
+$$
+
+**Kết hợp đầy đủ — dạng khai triển:**
+
+$$
+\text{OEE} = \frac{\text{ActualWorkingMinutes}}{\text{PlannedOperatingMinutes}}
+\times \frac{\text{TotalQty} \times \text{StandardCycleTime}}{\text{ActualWorkingMinutes}}
+\times \frac{\text{GoodQty}}{\text{TotalQty}}
+$$
+
+**Giản ước (simplification):**
+
+$$
+\text{OEE} = \frac{\text{GoodQty} \times \text{StandardCycleTime}}{\text{PlannedOperatingMinutes}}
+$$
+
+> **Lưu ý thực thi:** Trong SQL query (`SQL_OEE` ở `tang1_db_extractor.py`),
+> chúng tôi giữ NGUYÊN dạng 3 thành phần $A \times P \times Q$ — không dùng
+> dạng giản ước — để:
+> 1. Ghi nhận từng thành phần riêng biệt (cột `Availability`, `Performance`,
+>    `Quality`) phục vụ phân tích nguyên nhân suy giảm OEE.
+> 2. Mỗi phép chia đều có `NULLIF(..., 0)` — nếu mẫu số = 0 thì thành phần
+>    đó trả về `NULL`, OEE_Score tổng cũng `NULL` (ghi `WARNING` trong log).
+
+**Miền giá trị:**
+- $A, P, Q \in [0, 1]$ trong điều kiện lý tưởng (có thể > 1 nếu máy chạy
+  nhanh hơn thiết kế hoặc vận hành ngoài giờ).
+- $\text{OEE} \in [0, 1]$ thường thấy; OEE > 0.85 là "world-class" theo tiêu
+  chuẩn TPM (Total Productive Maintenance).
+
+**Nguồn dữ liệu SQL:**
+- `WorkOrders`: cung cấp `OrderNo`, `PlanQty`, `ActualEndDate`, `MachineLine`.
+- `ProductionLogs`: cung cấp `PlannedOperatingMinutes`, `ActualWorkingMinutes`,
+  `TotalQty`, `GoodQty`, `StandardCycleTime` — JOIN với `WorkOrders` qua `OrderNo`.
+
+### 1.3. SHA-256 — Chốt tính Toàn vẹn Dữ liệu
 
 Mỗi file CSV sau khi ghi ra đĩa được tính **checksum SHA-256** (NIST FIPS 180-4)
 và ghi vào `MANIFEST.md`. Mục đích: phát hiện **bất kỳ thay đổi nào** (dù chỉ 1 bit)
