@@ -2,11 +2,10 @@
 Tầng 1 — DB Layer: Khai thác dữ liệu gốc từ SQL Server.
 
 Mục đích:
-    Kết nối trực tiếp vào database ERP (`qtdn_datamining`) trên SQL Server,
-    trích xuất và TÍNH TOÁN 3 bảng phân tích (`cmt_oee_results`,
-    `cmt_delay_results`, `fob_revenue`) từ 3 bảng ERP gốc (`WorkOrders`,
-    `SalesOrders`, `Invoices`). Cả 3 truy vấn dùng chung một mốc thời gian
-    `snapshot_time` để đảm bảo tính nhất quán dữ liệu.
+    Kết nối trực tiếp vào database ERP (QTDN) trên SQL Server, trích xuất và
+    TÍNH TOÁN 3 bảng phân tích (`cmt_oee_results`, `cmt_delay_results`,
+    `fob_revenue`) từ các bảng Microsoft Dynamics NAV. Cả 3 truy vấn dùng
+    chung mốc thời gian `snapshot_time` để đảm bảo tính nhất quán dữ liệu.
 
 Thiết kế (theo ARCHITECTURE_4_tang.md, Tầng 1):
     1. Mở 1 kết nối SQL Server duy nhất, chốt `snapshot_time` MỘT LẦN.
@@ -18,24 +17,28 @@ Thiết kế (theo ARCHITECTURE_4_tang.md, Tầng 1):
     4. Tự động cập nhật `data/raw/MANIFEST.md`: timestamp, checksum SHA-256,
        số dòng mỗi file, tỉ lệ khớp OrderNo giữa 3 file.
 
-Input:  SQL Server (`qtdn_datamining`) — ĐÂY LÀ ĐIỂM TRUY CẬP SQL SERVER
-        DUY NHẤT của toàn bộ Phương án 3 (CLAUDE.md mục 4).
+Input:  SQL Server (QTDN) — ĐÂY LÀ ĐIỂM TRUY CẬP SQL SERVER DUY NHẤT
+        của toàn bộ Phương án 3 (CLAUDE.md mục 4).
 Output: `data/raw/snapshot_YYYYMMDD_HHMM/{cmt_oee_results.csv,
         cmt_delay_results.csv, fob_revenue.csv}` + `data/raw/MANIFEST.md`.
 Sở hữu: Role A — Data Engineering (skill.md).
 
-Bảng ERP gốc sử dụng:
-    - WorkOrders: dữ liệu lệnh sản xuất (OrderNo, PlanQty, ActualEndDate...)
-    - ProductionLogs: dữ liệu vận hành máy (PlannedOperatingMinutes,
-      ActualWorkingMinutes, TotalQty, GoodQty, StandardCycleTime) — JOIN
-      với WorkOrders qua OrderNo để tính OEE = A × P × Q
-    - SalesOrders: dữ liệu đơn hàng bán (PlannedShipmentDate, ActualShipDate...)
-    - Invoices: dữ liệu hóa đơn/doanh thu (FOBValue, ShipmentDate...)
+Bảng NAV (Dynamics NAV / Business Central) sử dụng:
+    - [Production Order Header]: lệnh sản xuất (No_, Starting Date, Ending Date)
+    - [Production Order Line]: chi tiết lệnh SX (Quantity, Finished Quantity,
+      Scrap %) — JOIN với Header qua [Prod_Order No_] = Header.[No_]
+    - [Production Order Routing Line]: thời gian vận hành máy (Setup Time,
+      Run Time) — dùng bổ sung cho phân tích OEE chi tiết
+    - [Sales Order Header]: đơn hàng bán (Shipment Date, Requested Delivery Date)
+    - [Import and Export Revenue Header] + [Import and Export Revenue Line]:
+      doanh thu xuất nhập khẩu (Quantity, Amount)
 
 Thay đổi so với bản trước:
-    - Bản cũ: SELECT * FROM cmt_oee_results (giả định bảng đã tồn tại sẵn)
-    - Bản mới: Truy vấn trực tiếp từ bảng ERP gốc, TÍNH TOÁN OEE/Delay/Revenue
-      bằng SQL — không phụ thuộc pipeline Phương án A chạy trước.
+    - v1: SELECT * FROM cmt_oee_results (bảng không tồn tại trong CSDL)
+    - v2: SELECT FROM WorkOrders/SalesOrders/Invoices (tên placeholder sai)
+    - v3 (bản này): Truy vấn đúng bảng NAV thật — [Production Order Header],
+      [Sales Order Header], [Import and Export Revenue Line] — đã xác nhận
+      tồn tại trong CSDL QTDN trên (local)\SQLEXPRESS.
 """
 
 import os
@@ -64,8 +67,8 @@ logger = get_logger("tang1")
 # mặc định (placeholder) bên dưới.
 # =====================================================================
 DB_CONFIG = {
-    "server": os.environ.get("DB_SERVER", "localhost"),
-    "database": os.environ.get("DB_DATABASE", "qtdn_datamining"),
+    "server": os.environ.get("DB_SERVER", r"(local)\SQLEXPRESS"),
+    "database": os.environ.get("DB_DATABASE", "QTDN"),
     "driver": os.environ.get("DB_DRIVER", "{ODBC Driver 17 for SQL Server}"),
     "username": os.environ.get("DB_USERNAME", ""),
     "password": os.environ.get("DB_PASSWORD", ""),
@@ -221,7 +224,7 @@ def _write_manifest(
         f"",
         f"- **Thời điểm trích xuất (snapshot_time):** {snapshot_time.isoformat()}",
         f"- **Thời điểm ghi file:** {datetime.now().isoformat()}",
-        f"- **Nguồn:** Truy vấn trực tiếp từ bảng ERP gốc (WorkOrders, ProductionLogs, SalesOrders, Invoices)",
+        f"- **Nguồn:** Truy vấn trực tiếp từ bảng NAV (Production Order Header/Line, Sales Order Header, Import and Export Revenue)",
         f"",
         f"### Danh sách file",
         f"",
@@ -271,152 +274,147 @@ def _write_manifest(
 
 
 # =====================================================================
-# CÁC TRUY VẤN SQL — TÍNH TOÁN TỪ BẢNG ERP GỐC
+# CÁC TRUY VẤN SQL — TÍNH TOÁN TỪ BẢNG DYNAMICS NAV THẬT
 # =====================================================================
-# Mỗi truy vấn:
-#   1. Đọc dữ liệu từ bảng ERP gốc (WorkOrders, SalesOrders, Invoices)
-#   2. TÍNH TOÁN chỉ số phân tích (OEE_Score, IsDelayed, Revenue)
-#   3. Lọc theo `<cột thời gian> <= ?` (snapshot_time) để đảm bảo
-#      cả 3 file phản ánh cùng một lát cắt thời gian.
+# Tên bảng và cột đã xác nhận tồn tại trên CSDL QTDN (local)\SQLEXPRESS
+# thông qua Object Explorer và SELECT TOP 3 * (ngày 2026-08-10).
 #
-# Anh Béo cần xác nhận/điều chỉnh tên cột nếu schema thực tế khác
-# tên placeholder bên dưới (vd: PlanQty → PlannedQuantity).
+# Bảng NAV có dấu cách trong tên → bọc bằng [dấu ngoặc vuông].
+# Cột NAV có hậu tố _ (vd: No_, Prod_Order No_) → giữ nguyên.
+#
+# Nếu Anh Béo thấy lỗi "Invalid column name" khi chạy, kiểm tra tên
+# cột bằng: SELECT TOP 1 * FROM [tên bảng]; rồi sửa lại ở đây.
 # =====================================================================
 
 # --- Truy vấn 1: OEE (Overall Equipment Effectiveness) ---
-# Tính từ bảng WorkOrders JOIN ProductionLogs — phân rã OEE theo tiêu chuẩn
-# quốc tế (Nakajima, 1988): OEE = Availability × Performance × Quality.
+# Nguồn: [Production Order Header] JOIN [Production Order Line]
+#   - Header: chứa No_ (mã LSX), Starting Date, Ending Date
+#   - Line: chứa Quantity (kế hoạch), Finished Quantity (thực tế), Scrap %
 #
-# Công thức phân rã (xem MATH_AND_ALGORITHMS.md mục 1.3):
-#   A (Availability)  = ActualWorkingMinutes / PlannedOperatingMinutes
-#   P (Performance)   = (TotalQty × StandardCycleTime) / ActualWorkingMinutes
-#   Q (Quality)       = GoodQty / TotalQty
-#   OEE_Score         = A × P × Q
+# Công thức OEE thực dụng cho dữ liệu NAV:
+#   Performance (P) = Finished Quantity / Quantity
+#     (tỉ lệ hoàn thành kế hoạch sản xuất)
+#   Quality (Q) = 1 - Scrap% / 100
+#     (tỉ lệ sản phẩm đạt chất lượng)
+#   OEE_Score = P × Q
 #
-# Nguồn dữ liệu:
-#   - WorkOrders: thông tin lệnh sản xuất (OrderNo, PlanQty, ActualEndDate...)
-#   - ProductionLogs: dữ liệu vận hành máy thực tế (thời gian chạy, sản lượng,
-#     chu kỳ chuẩn, sản phẩm đạt chất lượng)
+# Lưu ý: Công thức đầy đủ A×P×Q (Nakajima 1988) yêu cầu dữ liệu thời
+# gian máy thực tế (ActualWorkingMinutes) — NAV chuẩn không ghi trực
+# tiếp. Nếu cần, bổ sung JOIN [Capacity Ledger Entry] để tính Availability.
+# Xem MATH_AND_ALGORITHMS.md mục 1.2 cho công thức đầy đủ.
 #
-# NULLIF(..., 0) tại mỗi phép chia — tránh division by zero; nếu mẫu số = 0
-# thì thành phần đó trả về NULL → OEE_Score tổng cũng NULL (ghi WARNING ở
-# hàm extract_snapshot).
-#
-# Chỉ lấy lệnh sản xuất đã hoàn thành (ActualEndDate IS NOT NULL) và nằm
-# trong khung thời gian snapshot (zero look-ahead bias).
+# NULLIF(..., 0) tại mỗi phép chia — tránh division by zero.
+# Chỉ lấy LSX có Ending Date (đã hoàn thành) và <= snapshot_time.
 SQL_OEE = """
     SELECT
-        wo.OrderNo,
-        wo.ProductCode,
-        wo.PlanQty,
-        wo.ActualStartDate,
-        wo.ActualEndDate,
-        wo.MachineLine,
+        poh.[No_]                       AS OrderNo,
+        pol.[Item No_]                  AS ProductCode,
+        pol.[Quantity]                   AS PlanQty,
+        pol.[Finished Quantity]          AS RealQty,
+        pol.[Remaining Quantity]         AS RemainingQty,
+        pol.[Scrap %]                   AS ScrapPct,
+        poh.[Starting Date]             AS ActualStartDate,
+        poh.[Ending Date]               AS ActualEndDate,
+        poh.[Description],
+        poh.[Source No_]                AS SourceNo,
+        poh.[External Document No_]     AS ExternalDocNo,
 
-        -- Dữ liệu vận hành từ ProductionLogs
-        pl.PlannedOperatingMinutes,
-        pl.ActualWorkingMinutes,
-        pl.TotalQty,
-        pl.GoodQty,
-        pl.StandardCycleTime,
-
-        -- Availability: tỉ lệ thời gian máy chạy thực tế / kế hoạch
+        -- Performance: tỉ lệ hoàn thành kế hoạch
         ROUND(
-            CAST(pl.ActualWorkingMinutes AS FLOAT)
-            / NULLIF(pl.PlannedOperatingMinutes, 0),
-            4
-        ) AS Availability,
-
-        -- Performance: tỉ lệ năng suất thực tế so với năng suất lý thuyết
-        ROUND(
-            (CAST(pl.TotalQty AS FLOAT) * pl.StandardCycleTime)
-            / NULLIF(pl.ActualWorkingMinutes, 0),
+            CAST(pol.[Finished Quantity] AS FLOAT)
+            / NULLIF(pol.[Quantity], 0),
             4
         ) AS Performance,
 
-        -- Quality: tỉ lệ sản phẩm đạt chất lượng
+        -- Quality: tỉ lệ sản phẩm đạt (1 - phế phẩm)
         ROUND(
-            CAST(pl.GoodQty AS FLOAT)
-            / NULLIF(pl.TotalQty, 0),
+            1.0 - ISNULL(pol.[Scrap %], 0) / 100.0,
             4
         ) AS Quality,
 
-        -- OEE_Score = A × P × Q (tính đầy đủ 3 thành phần)
+        -- OEE_Score = Performance × Quality
         CASE
-            WHEN ISNULL(pl.PlannedOperatingMinutes, 0) = 0
-              OR ISNULL(pl.ActualWorkingMinutes, 0) = 0
-              OR ISNULL(pl.TotalQty, 0) = 0
-            THEN NULL
+            WHEN ISNULL(pol.[Quantity], 0) = 0 THEN NULL
             ELSE ROUND(
-                (CAST(pl.ActualWorkingMinutes AS FLOAT)
-                    / NULLIF(pl.PlannedOperatingMinutes, 0))
-              * ((CAST(pl.TotalQty AS FLOAT) * pl.StandardCycleTime)
-                    / NULLIF(pl.ActualWorkingMinutes, 0))
-              * (CAST(pl.GoodQty AS FLOAT)
-                    / NULLIF(pl.TotalQty, 0)),
+                (CAST(pol.[Finished Quantity] AS FLOAT)
+                    / NULLIF(pol.[Quantity], 0))
+                * (1.0 - ISNULL(pol.[Scrap %], 0) / 100.0),
                 4
             )
         END AS OEE_Score
 
-    FROM WorkOrders wo
-    INNER JOIN ProductionLogs pl
-        ON wo.OrderNo = pl.OrderNo
-    WHERE wo.ActualEndDate IS NOT NULL
-      AND wo.ActualEndDate <= ?
-    ORDER BY wo.ActualEndDate, wo.OrderNo
+    FROM [Production Order Header] poh
+    INNER JOIN [Production Order Line] pol
+        ON poh.[No_] = pol.[Prod_Order No_]
+        AND poh.[Status] = pol.[Status]
+    WHERE poh.[Ending Date] IS NOT NULL
+      AND poh.[Ending Date] <= ?
+    ORDER BY poh.[Ending Date], poh.[No_]
 """
 
 # --- Truy vấn 2: Delay (Trễ đơn hàng) ---
-# Tính từ bảng SalesOrders — mỗi dòng là 1 đơn hàng bán.
-# IsDelayed = 1 nếu ngày giao thực tế (ActualShipDate) muộn hơn
-#             ngày kế hoạch (PlannedShipmentDate).
-# DelayDays = số ngày trễ (0 nếu giao đúng hoặc sớm hơn kế hoạch).
-# Dùng ActualShipDate (ngày giao thực tế) làm mốc thời gian snapshot
-# — KHÔNG dùng PlannedShipmentDate vì ngày kế hoạch có thể bị điều
-# chỉnh ngược (zero look-ahead bias, xem INNOVATIONS.md mục 4.3).
+# Nguồn: [Sales Order Header]
+#   - No_: mã đơn hàng (vd: BDH00003)
+#   - [Sell-to Customer No_]: mã khách hàng
+#   - [Shipment Date]: ngày giao dự kiến (NAV cập nhật khi thay đổi)
+#   - [Requested Delivery Date]: ngày khách yêu cầu giao
+#
+# IsDelayed = 1 nếu Shipment Date > Requested Delivery Date
+# DelayDays = số ngày trễ (0 nếu đúng hạn hoặc sớm)
+#
+# Dùng [Shipment Date] làm mốc thời gian snapshot — đây là ngày NAV
+# ghi nhận cho lô hàng, phản ánh kế hoạch giao hàng thực tế.
 SQL_DELAY = """
     SELECT
-        so.OrderNo,
-        so.CustomerCode,
-        so.PlannedShipmentDate,
-        so.ActualShipDate,
+        soh.[No_]                        AS OrderNo,
+        soh.[Sell-to Customer No_]       AS CustomerCode,
+        soh.[Requested Delivery Date]    AS PlannedShipmentDate,
+        soh.[Shipment Date]              AS ActualShipDate,
+        soh.[External Document No_]      AS ExternalDocNo,
         CASE
-            WHEN so.ActualShipDate > so.PlannedShipmentDate THEN 1
+            WHEN soh.[Shipment Date] > soh.[Requested Delivery Date] THEN 1
             ELSE 0
         END AS IsDelayed,
         CASE
-            WHEN so.ActualShipDate > so.PlannedShipmentDate
-                THEN DATEDIFF(DAY, so.PlannedShipmentDate, so.ActualShipDate)
+            WHEN soh.[Shipment Date] > soh.[Requested Delivery Date]
+                THEN DATEDIFF(DAY,
+                     soh.[Requested Delivery Date],
+                     soh.[Shipment Date])
             ELSE 0
         END AS DelayDays
-    FROM SalesOrders so
-    WHERE so.ActualShipDate IS NOT NULL
-      AND so.ActualShipDate <= ?
-    ORDER BY so.ActualShipDate, so.OrderNo
+    FROM [Sales Order Header] soh
+    WHERE soh.[Shipment Date] IS NOT NULL
+      AND soh.[Requested Delivery Date] IS NOT NULL
+      AND soh.[Shipment Date] <= ?
+    ORDER BY soh.[Shipment Date], soh.[No_]
 """
 
-# --- Truy vấn 3: FOB Revenue (Doanh thu xuất khẩu) ---
-# Tính từ bảng Invoices — mỗi dòng là 1 hóa đơn xuất khẩu.
-# Revenue = Quantity * UnitPrice (tổng giá trị FOB cho từng dòng).
-# TotalFOBValue là tổng giá trị đã có sẵn trong hóa đơn (nếu có),
-# nếu không thì tính từ Quantity * UnitPrice.
-# Dùng ShipmentDate làm mốc thời gian snapshot.
+# --- Truy vấn 3: FOB Revenue (Doanh thu xuất nhập khẩu) ---
+# Nguồn: [Import and Export Revenue Line] JOIN [Import and Export Revenue Header]
+#   - Line: Document No_, Quantity, Amount, Country Code
+#   - Header: No_ (khớp Document No_), ngày chứng từ (Posting Date / Document Date)
+#
+# Revenue = Amount (đã có sẵn trong NAV, không cần tính Qty × UnitPrice)
+#
+# Lưu ý: Tên cột ngày trên Header có thể là [Posting Date] hoặc
+# [Document Date] — nếu lỗi "Invalid column name", chạy
+#   SELECT TOP 1 * FROM [Import and Export Revenue Header]
+# để xác nhận tên cột ngày thực tế rồi sửa lại bên dưới.
 SQL_REVENUE = """
     SELECT
-        inv.OrderNo,
-        inv.InvoiceNo,
-        inv.CustomerCode,
-        inv.ShipmentDate,
-        inv.Quantity,
-        inv.UnitPrice,
-        ISNULL(
-            inv.TotalFOBValue,
-            ROUND(CAST(inv.Quantity AS FLOAT) * CAST(inv.UnitPrice AS FLOAT), 2)
-        ) AS Revenue
-    FROM Invoices inv
-    WHERE inv.ShipmentDate IS NOT NULL
-      AND inv.ShipmentDate <= ?
-    ORDER BY inv.ShipmentDate, inv.OrderNo
+        rl.[Document No_]               AS OrderNo,
+        rh.[No_]                        AS HeaderNo,
+        rl.[Description],
+        rl.[Country Code]               AS CountryCode,
+        rl.[Quantity],
+        rl.[Amount]                     AS Revenue,
+        rl.[Status]
+    FROM [Import and Export Revenue Line] rl
+    INNER JOIN [Import and Export Revenue Header] rh
+        ON rl.[Document No_] = rh.[No_]
+    WHERE rl.[Document No_] IS NOT NULL
+      AND rl.[Document No_] != ''
+    ORDER BY rl.[Document No_]
 """
 
 # Ánh xạ tên bảng đầu ra → truy vấn SQL tương ứng

@@ -102,10 +102,21 @@ $$
 - $\text{OEE} \in [0, 1]$ thường thấy; OEE > 0.85 là "world-class" theo tiêu
   chuẩn TPM (Total Productive Maintenance).
 
-**Nguồn dữ liệu SQL:**
-- `WorkOrders`: cung cấp `OrderNo`, `PlanQty`, `ActualEndDate`, `MachineLine`.
-- `ProductionLogs`: cung cấp `PlannedOperatingMinutes`, `ActualWorkingMinutes`,
-  `TotalQty`, `GoodQty`, `StandardCycleTime` — JOIN với `WorkOrders` qua `OrderNo`.
+**Nguồn dữ liệu SQL (Dynamics NAV — CSDL QTDN):**
+- `[Production Order Header]`: cung cấp `No_` (mã LSX), `Starting Date`, `Ending Date`.
+- `[Production Order Line]`: cung cấp `Quantity` (PlanQty), `Finished Quantity` (RealQty),
+  `Scrap %` — JOIN với Header qua `[Prod_Order No_]` = Header.`[No_]`.
+
+**Thích ứng NAV:** Do bảng NAV chuẩn không ghi trực tiếp `ActualWorkingMinutes`
+và `PlannedOperatingMinutes` (cần bổ sung `[Capacity Ledger Entry]`), pipeline hiện
+tại tính OEE theo dạng rút gọn **P × Q**:
+
+$$
+\text{OEE}_{\text{NAV}} = \underbrace{\frac{\text{Finished Quantity}}{\text{Quantity}}}_{P}
+\times \underbrace{\left(1 - \frac{\text{Scrap \%}}{100}\right)}_{Q}
+$$
+
+Khi doanh nghiệp bổ sung dữ liệu thời gian máy thực tế, sẽ nâng cấp lên A × P × Q đầy đủ.
 
 ### 1.3. SHA-256 — Chốt tính Toàn vẹn Dữ liệu
 

@@ -77,7 +77,7 @@ vào SQL Server để truy vấn 4 bảng ERP gốc (`WorkOrders`, `ProductionLo
 
 ```cmd
 set DB_SERVER=192.168.1.100\SQLEXPRESS
-set DB_DATABASE=qtdn_datamining
+set DB_DATABASE=QTDN
 set DB_DRIVER={ODBC Driver 17 for SQL Server}
 set DB_TRUSTED=true
 ```
@@ -86,7 +86,7 @@ set DB_TRUSTED=true
 
 ```powershell
 $env:DB_SERVER = "192.168.1.100\SQLEXPRESS"
-$env:DB_DATABASE = "qtdn_datamining"
+$env:DB_DATABASE = "QTDN"
 $env:DB_DRIVER = "{ODBC Driver 17 for SQL Server}"
 $env:DB_TRUSTED = "true"
 ```
@@ -95,7 +95,7 @@ $env:DB_TRUSTED = "true"
 
 ```bash
 export DB_SERVER="192.168.1.100\\SQLEXPRESS"
-export DB_DATABASE="qtdn_datamining"
+export DB_DATABASE="QTDN"
 export DB_DRIVER="{ODBC Driver 17 for SQL Server}"
 export DB_TRUSTED="true"
 ```
@@ -111,7 +111,7 @@ export DB_PASSWORD="YourPassword123"
 | Biến môi trường | Mô tả | Giá trị mặc định |
 |---|---|---|
 | `DB_SERVER` | Tên hoặc IP của SQL Server instance | `localhost` |
-| `DB_DATABASE` | Tên database chứa bảng ERP | `qtdn_datamining` |
+| `DB_DATABASE` | Tên database chứa bảng ERP | `QTDN` |
 | `DB_DRIVER` | ODBC Driver string | `{ODBC Driver 17 for SQL Server}` |
 | `DB_TRUSTED` | `true` = Windows Auth, `false` = SQL Auth | `true` |
 | `DB_USERNAME` | Username (chỉ khi `DB_TRUSTED=false`) | _(trống)_ |
@@ -124,7 +124,7 @@ Mở `scripts/tang1_db_extractor.py`, tìm dict `DB_CONFIG` và sửa giá trị
 ```python
 DB_CONFIG = {
     "server": os.environ.get("DB_SERVER", "192.168.1.100\\SQLEXPRESS"),
-    "database": os.environ.get("DB_DATABASE", "qtdn_datamining"),
+    "database": os.environ.get("DB_DATABASE", "QTDN"),
     ...
 }
 ```
@@ -149,40 +149,39 @@ Nếu chưa có, tạo bằng lệnh:
 mkdir -p data/raw data/processed reports/logs
 ```
 
-### 3.3. Tiền điều kiện: 4 bảng ERP gốc phải tồn tại trong CSDL
+### 3.3. Tiền điều kiện: Bảng Dynamics NAV phải tồn tại trong CSDL
 
-> **Quan trọng:** Script `tang1_db_extractor.py` truy vấn trực tiếp **4 bảng
-> ERP gốc** trong database `qtdn_datamining` để tính toán 3 chỉ số phân tích:
+> **Quan trọng:** Script `tang1_db_extractor.py` truy vấn trực tiếp các bảng
+> **Microsoft Dynamics NAV** trong database **QTDN** để tính toán 3 chỉ số:
 >
-> | Bảng ERP gốc | Vai trò | Các cột chính |
+> | Bảng NAV | Vai trò | Các cột chính |
 > |---|---|---|
-> | `WorkOrders` | Lệnh sản xuất | `OrderNo`, `PlanQty`, `ActualEndDate`, `MachineLine` |
-> | `ProductionLogs` | Dữ liệu vận hành máy | `PlannedOperatingMinutes`, `ActualWorkingMinutes`, `TotalQty`, `GoodQty`, `StandardCycleTime` |
-> | `SalesOrders` | Đơn hàng bán | `OrderNo`, `PlannedShipmentDate`, `ActualShipDate` |
-> | `Invoices` | Hóa đơn/doanh thu | `OrderNo`, `Quantity`, `UnitPrice`, `ShipmentDate` |
+> | `[Production Order Header]` | Lệnh sản xuất | `No_`, `Starting Date`, `Ending Date`, `Source No_` |
+> | `[Production Order Line]` | Chi tiết lệnh SX | `Prod_Order No_`, `Quantity`, `Finished Quantity`, `Scrap %` |
+> | `[Sales Order Header]` | Đơn hàng bán | `No_`, `Sell-to Customer No_`, `Shipment Date`, `Requested Delivery Date` |
+> | `[Import and Export Revenue Header]` | Header doanh thu XNK | `No_` |
+> | `[Import and Export Revenue Line]` | Chi tiết doanh thu XNK | `Document No_`, `Quantity`, `Amount` |
 >
 > **Chỉ số đầu ra:**
 >
-> | File CSV | Công thức | Nguồn |
+> | File CSV | Công thức | Nguồn NAV |
 > |---|---|---|
-> | `cmt_oee_results.csv` | `OEE = A × P × Q` (phân rã 3 thành phần) | `WorkOrders` JOIN `ProductionLogs` |
-> | `cmt_delay_results.csv` | `IsDelayed`, `DelayDays` | `SalesOrders` |
-> | `fob_revenue.csv` | `Revenue = Quantity × UnitPrice` | `Invoices` |
+> | `cmt_oee_results.csv` | `OEE = P × Q` (Performance × Quality) | `[Production Order Header]` JOIN `[Production Order Line]` |
+> | `cmt_delay_results.csv` | `IsDelayed`, `DelayDays` | `[Sales Order Header]` |
+> | `fob_revenue.csv` | `Revenue = Amount` | `[Import and Export Revenue Line]` JOIN `Header` |
 >
-> **Trước khi chạy Tầng 1, phải xác nhận** 4 bảng trên đã tồn tại và có
-> dữ liệu trong CSDL. Kiểm tra nhanh bằng SQL:
+> **Trước khi chạy Tầng 1, phải xác nhận** các bảng trên đã tồn tại:
 >
 > ```sql
-> SELECT COUNT(*) FROM WorkOrders     WHERE ActualEndDate IS NOT NULL;
-> SELECT COUNT(*) FROM ProductionLogs WHERE OrderNo IS NOT NULL;
-> SELECT COUNT(*) FROM SalesOrders    WHERE ActualShipDate IS NOT NULL;
-> SELECT COUNT(*) FROM Invoices       WHERE ShipmentDate IS NOT NULL;
+> SELECT COUNT(*) FROM [Production Order Header]       WHERE [Ending Date] IS NOT NULL;
+> SELECT COUNT(*) FROM [Production Order Line]          WHERE [Quantity] > 0;
+> SELECT COUNT(*) FROM [Sales Order Header]             WHERE [Shipment Date] IS NOT NULL;
+> SELECT COUNT(*) FROM [Import and Export Revenue Line]  WHERE [Document No_] IS NOT NULL;
 > ```
 >
-> Nếu tên bảng/cột trong database thực tế khác tên placeholder ở trên
-> (vd: `TotalQty` thực tế là `ProducedQuantity`), cần sửa lại các biến
-> `SQL_OEE`, `SQL_DELAY`, `SQL_REVENUE` trong `scripts/tang1_db_extractor.py`
-> cho khớp với schema thật.
+> Nếu thấy lỗi `Invalid column name`, chạy `SELECT TOP 1 * FROM [tên bảng]`
+> để xem tên cột thực tế, rồi sửa biến `SQL_OEE`, `SQL_DELAY`, `SQL_REVENUE`
+> trong `scripts/tang1_db_extractor.py` cho khớp.
 
 ---
 
@@ -197,17 +196,15 @@ Chạy tuần tự từ Tầng 1 đến Tầng 4. Mỗi tầng đọc output c�
 python scripts/tang1_db_extractor.py
 ```
 
-> Yêu cầu: 4 bảng ERP gốc (`WorkOrders`, `ProductionLogs`, `SalesOrders`,
-> `Invoices`) phải tồn tại trong CSDL — xem mục 3.3 trước khi chạy.
+> Yêu cầu: Các bảng Dynamics NAV phải tồn tại trong CSDL QTDN — xem mục 3.3.
 > Cấu hình kết nối phải hoàn tất — xem mục 3.1.
 
-- Kết nối SQL Server qua `pyodbc`, truy vấn 4 bảng ERP gốc và TÍNH TOÁN:
-  - `OEE_Score` = A × P × Q (từ `WorkOrders` JOIN `ProductionLogs`)
-    - A = ActualWorkingMinutes / PlannedOperatingMinutes
-    - P = (TotalQty × StandardCycleTime) / ActualWorkingMinutes
-    - Q = GoodQty / TotalQty
-  - `IsDelayed`, `DelayDays` (từ `SalesOrders`)
-  - `Revenue` = Quantity × UnitPrice (từ `Invoices`)
+- Kết nối SQL Server qua `pyodbc`, truy vấn bảng NAV và TÍNH TOÁN:
+  - `OEE_Score` = P × Q (từ `[Production Order Header]` JOIN `[Production Order Line]`)
+    - P (Performance) = `Finished Quantity` / `Quantity`
+    - Q (Quality) = 1 - `Scrap %` / 100
+  - `IsDelayed`, `DelayDays` (từ `[Sales Order Header]`)
+  - `Revenue` = `Amount` (từ `[Import and Export Revenue Line]`)
 - Tính Jaccard Index kiểm tra overlap OrderNo giữa các bảng
 - Tính SHA-256 checksum cho từng file đầu ra
 - Ghi snapshot bất biến vào `data/raw/snapshot_YYYYMMDD_HHMM/`
@@ -299,7 +296,8 @@ wc -l data/processed/causal_weekly_dataset.csv
 | `[IM002] Data source name not found` | Thiếu ODBC Driver | Cài ODBC Driver 17 for SQL Server |
 | `FileNotFoundError: reports/phase1_*.json` | Chạy sai thứ tự | Chạy lại từ Tầng 1, tuần tự |
 | `Connection timeout` | SQL Server không truy cập được | Kiểm tra firewall, IP, tên instance |
-| `Invalid object name 'WorkOrders'` (hoặc `ProductionLogs`/`SalesOrders`/`Invoices`) | Bảng ERP gốc chưa tồn tại trong CSDL hoặc sai tên | Kiểm tra schema CSDL thực tế, sửa tên bảng/cột trong biến `SQL_OEE`, `SQL_DELAY`, `SQL_REVENUE` ở `tang1_db_extractor.py`; xem mục 3.3 |
+| `Invalid object name 'Production Order Header'` | Bảng NAV chưa tồn tại trong CSDL hoặc sai tên | Chạy `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME LIKE '%Production%'` để tìm tên đúng; xem mục 3.3 |
+| `Invalid column name 'Finished Quantity'` | Tên cột NAV khác với mặc định | Chạy `SELECT TOP 1 * FROM [tên bảng]` để xem cột thực tế, sửa biến `SQL_OEE`/`SQL_DELAY`/`SQL_REVENUE` |
 | `Login failed for user` | Sai username/password hoặc chưa cấu hình | Kiểm tra biến môi trường `DB_USERNAME`, `DB_PASSWORD`, `DB_TRUSTED`; xem mục 3.1 |
 
 ---
