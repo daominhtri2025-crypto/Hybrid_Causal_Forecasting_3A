@@ -29,7 +29,7 @@ Bảng NAV (Dynamics NAV / Business Central) sử dụng:
       cho LSX đã đăng (posted) — KPI hiện tại dùng bảng Posted; ta dùng Header
       để bao gồm cả LSX đang xử lý (Status=Released/Finished chưa post).
     - [Production Order Line]: chi tiết lệnh SX (Quantity, Finished Quantity,
-      Scrap %) — JOIN với Header qua [Prod_Order No_] = Header.[No_]
+      Scrap %) — JOIN với Header qua [Prod_ Order No_] = Header.[No_]
     - [Production Order Routing Finished]: thời gian vận hành máy (Run Time,
       Setup Time, Move Time) — dùng bởi KPI OEE thời gian; ta dùng Line
       cho OEE số lượng (P×Q).
@@ -291,7 +291,7 @@ def _write_manifest(
 #      sử dụng bởi các hàm KPI hiện có (KPI_0_91, KPI_2_51, KPI_2_64...).
 #
 # Bảng NAV có dấu cách trong tên → bọc bằng [dấu ngoặc vuông].
-# Cột NAV có hậu tố _ (vd: No_, Prod_Order No_) → giữ nguyên.
+# Cột NAV có hậu tố _ (vd: No_, Prod_ Order No_) → giữ nguyên.
 #
 # Nếu Anh Béo thấy lỗi "Invalid column name" khi chạy, kiểm tra tên
 # cột bằng: SELECT TOP 1 * FROM [tên bảng]; rồi sửa lại ở đây.
@@ -362,7 +362,7 @@ SQL_OEE = """
 
     FROM [Production Order Header] poh
     INNER JOIN [Production Order Line] pol
-        ON poh.[No_] = pol.[Prod_Order No_]
+        ON poh.[No_] = pol.[Prod_ Order No_]
         AND poh.[Status] = pol.[Status]
     WHERE poh.[Ending Date] IS NOT NULL
       AND poh.[Ending Date] <= ?
