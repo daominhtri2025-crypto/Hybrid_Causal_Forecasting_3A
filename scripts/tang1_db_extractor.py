@@ -25,7 +25,10 @@ Output: `data/raw/snapshot_YYYYMMDD_HHMM/{cmt_oee_results.csv,
 Sở hữu: Role A — Data Engineering (skill.md).
 
 Bảng ERP gốc sử dụng:
-    - WorkOrders: dữ liệu lệnh sản xuất (PlanQty, RealQty, ActualEndDate...)
+    - WorkOrders: dữ liệu lệnh sản xuất (OrderNo, PlanQty, ActualEndDate...)
+    - ProductionLogs: dữ liệu vận hành máy (PlannedOperatingMinutes,
+      ActualWorkingMinutes, TotalQty, GoodQty, StandardCycleTime) — JOIN
+      với WorkOrders qua OrderNo để tính OEE = A × P × Q
     - SalesOrders: dữ liệu đơn hàng bán (PlannedShipmentDate, ActualShipDate...)
     - Invoices: dữ liệu hóa đơn/doanh thu (FOBValue, ShipmentDate...)
 
@@ -218,7 +221,7 @@ def _write_manifest(
         f"",
         f"- **Thời điểm trích xuất (snapshot_time):** {snapshot_time.isoformat()}",
         f"- **Thời điểm ghi file:** {datetime.now().isoformat()}",
-        f"- **Nguồn:** Truy vấn trực tiếp từ bảng ERP gốc (WorkOrders, SalesOrders, Invoices)",
+        f"- **Nguồn:** Truy vấn trực tiếp từ bảng ERP gốc (WorkOrders, ProductionLogs, SalesOrders, Invoices)",
         f"",
         f"### Danh sách file",
         f"",
@@ -281,28 +284,83 @@ def _write_manifest(
 # =====================================================================
 
 # --- Truy vấn 1: OEE (Overall Equipment Effectiveness) ---
-# Tính từ bảng WorkOrders — mỗi dòng là 1 lệnh sản xuất.
-# OEE_Score = RealQty / PlanQty (tỉ lệ sản lượng thực tế so với kế hoạch).
-# NULLIF(PlanQty, 0) tránh chia cho 0 khi PlanQty = 0.
-# Chỉ lấy các lệnh sản xuất đã hoàn thành (ActualEndDate IS NOT NULL)
-# và nằm trong khung thời gian snapshot.
+# Tính từ bảng WorkOrders JOIN ProductionLogs — phân rã OEE theo tiêu chuẩn
+# quốc tế (Nakajima, 1988): OEE = Availability × Performance × Quality.
+#
+# Công thức phân rã (xem MATH_AND_ALGORITHMS.md mục 1.3):
+#   A (Availability)  = ActualWorkingMinutes / PlannedOperatingMinutes
+#   P (Performance)   = (TotalQty × StandardCycleTime) / ActualWorkingMinutes
+#   Q (Quality)       = GoodQty / TotalQty
+#   OEE_Score         = A × P × Q
+#
+# Nguồn dữ liệu:
+#   - WorkOrders: thông tin lệnh sản xuất (OrderNo, PlanQty, ActualEndDate...)
+#   - ProductionLogs: dữ liệu vận hành máy thực tế (thời gian chạy, sản lượng,
+#     chu kỳ chuẩn, sản phẩm đạt chất lượng)
+#
+# NULLIF(..., 0) tại mỗi phép chia — tránh division by zero; nếu mẫu số = 0
+# thì thành phần đó trả về NULL → OEE_Score tổng cũng NULL (ghi WARNING ở
+# hàm extract_snapshot).
+#
+# Chỉ lấy lệnh sản xuất đã hoàn thành (ActualEndDate IS NOT NULL) và nằm
+# trong khung thời gian snapshot (zero look-ahead bias).
 SQL_OEE = """
     SELECT
         wo.OrderNo,
         wo.ProductCode,
         wo.PlanQty,
-        wo.RealQty,
         wo.ActualStartDate,
         wo.ActualEndDate,
         wo.MachineLine,
+
+        -- Dữ liệu vận hành từ ProductionLogs
+        pl.PlannedOperatingMinutes,
+        pl.ActualWorkingMinutes,
+        pl.TotalQty,
+        pl.GoodQty,
+        pl.StandardCycleTime,
+
+        -- Availability: tỉ lệ thời gian máy chạy thực tế / kế hoạch
+        ROUND(
+            CAST(pl.ActualWorkingMinutes AS FLOAT)
+            / NULLIF(pl.PlannedOperatingMinutes, 0),
+            4
+        ) AS Availability,
+
+        -- Performance: tỉ lệ năng suất thực tế so với năng suất lý thuyết
+        ROUND(
+            (CAST(pl.TotalQty AS FLOAT) * pl.StandardCycleTime)
+            / NULLIF(pl.ActualWorkingMinutes, 0),
+            4
+        ) AS Performance,
+
+        -- Quality: tỉ lệ sản phẩm đạt chất lượng
+        ROUND(
+            CAST(pl.GoodQty AS FLOAT)
+            / NULLIF(pl.TotalQty, 0),
+            4
+        ) AS Quality,
+
+        -- OEE_Score = A × P × Q (tính đầy đủ 3 thành phần)
         CASE
-            WHEN ISNULL(wo.PlanQty, 0) = 0 THEN NULL
+            WHEN ISNULL(pl.PlannedOperatingMinutes, 0) = 0
+              OR ISNULL(pl.ActualWorkingMinutes, 0) = 0
+              OR ISNULL(pl.TotalQty, 0) = 0
+            THEN NULL
             ELSE ROUND(
-                CAST(wo.RealQty AS FLOAT) / NULLIF(wo.PlanQty, 0),
+                (CAST(pl.ActualWorkingMinutes AS FLOAT)
+                    / NULLIF(pl.PlannedOperatingMinutes, 0))
+              * ((CAST(pl.TotalQty AS FLOAT) * pl.StandardCycleTime)
+                    / NULLIF(pl.ActualWorkingMinutes, 0))
+              * (CAST(pl.GoodQty AS FLOAT)
+                    / NULLIF(pl.TotalQty, 0)),
                 4
             )
         END AS OEE_Score
+
     FROM WorkOrders wo
+    INNER JOIN ProductionLogs pl
+        ON wo.OrderNo = pl.OrderNo
     WHERE wo.ActualEndDate IS NOT NULL
       AND wo.ActualEndDate <= ?
     ORDER BY wo.ActualEndDate, wo.OrderNo
