@@ -159,8 +159,12 @@ mkdir -p data/raw data/processed reports/logs
 > | `[Production Order Header]` | Lệnh sản xuất | `No_`, `Starting Date`, `Ending Date`, `Source No_` |
 > | `[Production Order Line]` | Chi tiết lệnh SX | `Prod_Order No_`, `Quantity`, `Finished Quantity`, `Scrap %` |
 > | `[Sales Order Header]` | Đơn hàng bán | `No_`, `Sell-to Customer No_`, `Shipment Date`, `Requested Delivery Date` |
-> | `[Import and Export Revenue Header]` | Header doanh thu XNK | `No_` |
-> | `[Import and Export Revenue Line]` | Chi tiết doanh thu XNK | `Document No_`, `Quantity`, `Amount` |
+> | `[Cust_ Ledger Entry]` | Sổ cái khách hàng (doanh thu) | `Document No_`, `Customer No_`, `Sales (LCY)`, `Posting Date`, `Document Type` |
+>
+> **Lưu ý:** Doanh thu lấy từ `[Cust_ Ledger Entry].[Sales (LCY)]` — đây là
+> bảng mà các hàm KPI trong CSDL QTDN thực sự sử dụng (KPI_0_91, KPI_2_51).
+> Phiên bản trước dùng `[Import and Export Revenue Line]` nhưng bảng đó không
+> được tham chiếu bởi bất kỳ hàm KPI nào trong CSDL.
 >
 > **Chỉ số đầu ra:**
 >
@@ -168,20 +172,22 @@ mkdir -p data/raw data/processed reports/logs
 > |---|---|---|
 > | `cmt_oee_results.csv` | `OEE = P × Q` (Performance × Quality) | `[Production Order Header]` JOIN `[Production Order Line]` |
 > | `cmt_delay_results.csv` | `IsDelayed`, `DelayDays` | `[Sales Order Header]` |
-> | `fob_revenue.csv` | `Revenue = Amount` | `[Import and Export Revenue Line]` JOIN `Header` |
+> | `fob_revenue.csv` | `Revenue = Sales (LCY)` | `[Cust_ Ledger Entry]` (Document Type = Invoice) |
 >
 > **Trước khi chạy Tầng 1, phải xác nhận** các bảng trên đã tồn tại:
 >
 > ```sql
-> SELECT COUNT(*) FROM [Production Order Header]       WHERE [Ending Date] IS NOT NULL;
-> SELECT COUNT(*) FROM [Production Order Line]          WHERE [Quantity] > 0;
-> SELECT COUNT(*) FROM [Sales Order Header]             WHERE [Shipment Date] IS NOT NULL;
-> SELECT COUNT(*) FROM [Import and Export Revenue Line]  WHERE [Document No_] IS NOT NULL;
+> SELECT COUNT(*) FROM [Production Order Header]  WHERE [Ending Date] IS NOT NULL;
+> SELECT COUNT(*) FROM [Production Order Line]     WHERE [Quantity] > 0;
+> SELECT COUNT(*) FROM [Sales Order Header]        WHERE [Shipment Date] IS NOT NULL;
+> SELECT COUNT(*) FROM [Cust_ Ledger Entry]        WHERE [Document Type] = 2 AND [Sales (LCY)] <> 0;
 > ```
 >
-> Nếu thấy lỗi `Invalid column name`, chạy `SELECT TOP 1 * FROM [tên bảng]`
-> để xem tên cột thực tế, rồi sửa biến `SQL_OEE`, `SQL_DELAY`, `SQL_REVENUE`
-> trong `scripts/tang1_db_extractor.py` cho khớp.
+> Nếu thấy lỗi `Invalid object name 'Cust_ Ledger Entry'`, thử thay bằng
+> `[Customer Ledger Entry]` (tên NAV Business Central). Nếu thấy lỗi
+> `Invalid column name`, chạy `SELECT TOP 1 * FROM [tên bảng]` để xem tên
+> cột thực tế, rồi sửa biến `SQL_OEE`, `SQL_DELAY`, `SQL_REVENUE` trong
+> `scripts/tang1_db_extractor.py` cho khớp.
 
 ---
 
@@ -204,7 +210,7 @@ python scripts/tang1_db_extractor.py
     - P (Performance) = `Finished Quantity` / `Quantity`
     - Q (Quality) = 1 - `Scrap %` / 100
   - `IsDelayed`, `DelayDays` (từ `[Sales Order Header]`)
-  - `Revenue` = `Amount` (từ `[Import and Export Revenue Line]`)
+  - `Revenue` = `Sales (LCY)` (từ `[Cust_ Ledger Entry]`, chỉ lấy hóa đơn)
 - Tính Jaccard Index kiểm tra overlap OrderNo giữa các bảng
 - Tính SHA-256 checksum cho từng file đầu ra
 - Ghi snapshot bất biến vào `data/raw/snapshot_YYYYMMDD_HHMM/`

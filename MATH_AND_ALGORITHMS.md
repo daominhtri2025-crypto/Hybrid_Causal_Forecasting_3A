@@ -104,11 +104,15 @@ $$
 
 **Nguồn dữ liệu SQL (Dynamics NAV — CSDL QTDN):**
 - `[Production Order Header]`: cung cấp `No_` (mã LSX), `Starting Date`, `Ending Date`.
+  Lưu ý: CSDL còn có `[Production Order Header Posted]` cho LSX đã đăng (posted) —
+  các hàm KPI hiện tại (KPI_2_64, KPI_2_67) dùng bảng Posted. Pipeline dùng Header
+  (chưa post) vì cần `[Ending Date]` và cột thống kê trên `[Production Order Line]`.
 - `[Production Order Line]`: cung cấp `Quantity` (PlanQty), `Finished Quantity` (RealQty),
   `Scrap %` — JOIN với Header qua `[Prod_Order No_]` = Header.`[No_]`.
 
 **Thích ứng NAV:** Do bảng NAV chuẩn không ghi trực tiếp `ActualWorkingMinutes`
-và `PlannedOperatingMinutes` (cần bổ sung `[Capacity Ledger Entry]`), pipeline hiện
+và `PlannedOperatingMinutes` (cần bổ sung `[Capacity Ledger Entry]` hoặc
+`[Production Order Routing Finished]` cho `Run Time`, `Setup Time`), pipeline hiện
 tại tính OEE theo dạng rút gọn **P × Q**:
 
 $$
@@ -117,6 +121,15 @@ $$
 $$
 
 Khi doanh nghiệp bổ sung dữ liệu thời gian máy thực tế, sẽ nâng cấp lên A × P × Q đầy đủ.
+
+**Nguồn dữ liệu Revenue (Doanh thu):**
+- `[Cust_ Ledger Entry]`: Sổ cái khách hàng (NAV Table ID 21), cột `[Sales (LCY)]`
+  chứa doanh thu bằng nội tệ (VND). Đây là bảng mà toàn bộ hàm KPI trong CSDL QTDN
+  thực sự sử dụng để tính doanh thu (xác nhận qua QTDN.sql: KPI_0_91, KPI_0_93,
+  KPI_2_51). Filter `[Document Type] = 2` (Invoice) để chỉ lấy hóa đơn bán hàng.
+- Lưu ý lịch sử: phiên bản trước dùng `[Import and Export Revenue Line].[Amount]` —
+  bảng này tồn tại trong CSDL nhưng không được tham chiếu bởi bất kỳ hàm KPI nào,
+  có thể chỉ phản ánh doanh thu XNK (một phần, không đầy đủ).
 
 ### 1.3. SHA-256 — Chốt tính Toàn vẹn Dữ liệu
 
