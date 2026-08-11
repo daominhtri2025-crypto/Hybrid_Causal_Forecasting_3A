@@ -119,7 +119,51 @@ $$
 
 ---
 
-### 2.2. Đối chiếu Chéo — Toda-Yamamoto vs Granger
+### 2.2. Giải quyết Mâu thuẫn ADF/KPSS — Zivot-Andrews Tiebreaker
+
+#### Bảng so sánh
+
+| Tiêu chí | Phương pháp Truyền thống | Phương án 3-A (Dự án) |
+|-----------|--------------------------|------------------------|
+| **Xử lý Case 3 (mâu thuẫn)** | Bỏ qua hoặc kết luận thủ công | Tự động chạy Zivot-Andrews (1992) làm tiebreaker |
+| **Structural break** | Không phát hiện — ADF/KPSS giả định chuỗi đồng nhất | ZA cho phép 1 break nội sinh — phát hiện vị trí break tự động |
+| **Quy trình** | Manual review → quyết định ad-hoc | Tự động: ADF+KPSS mâu thuẫn → ZA → stationary/contradictory |
+| **Transparency** | Không có audit trail cho quyết định | Log đầy đủ: ZA statistic, p-value, breakpoint, kết luận |
+
+#### Phân tích chuyên sâu
+
+**Vấn đề với Case 3 (cả ADF lẫn KPSS đều bác bỏ $H_0$):**
+- ADF nói "không có unit root" (dừng), KPSS nói "không dừng" — hai kết luận
+  ngược nhau.
+- Nguyên nhân phổ biến nhất: chuỗi **dừng quanh structural break** — ADF phát
+  hiện mean-reversion trong từng đoạn, nhưng KPSS phát hiện sự thay đổi mức
+  (level shift) giữa các đoạn.
+- Nếu bỏ qua hoặc xử lý thủ công → kết luận phụ thuộc chủ quan → không tái
+  lập được.
+
+**Giải pháp Zivot-Andrews:**
+
+$$
+H_0: y_t \text{ có unit root (không break)}
+\quad vs \quad
+H_1: y_t \text{ dừng quanh 1 structural break tại } T_B^*
+$$
+
+- ZA tìm break point $T_B^*$ **nội sinh** (endogenous) — không cần biết trước
+  vị trí break, tránh data snooping.
+- Nếu ZA bác bỏ $H_0$ ($p < 0.05$) → chuỗi dừng quanh break → kết luận
+  **stationary** (phù hợp với ADF).
+- Nếu ZA không bác bỏ → giữ **contradictory**, tạm xử lý như dừng (bảo thủ —
+  tránh over-differencing).
+
+**Ý nghĩa khoa học:** Tự động hóa hoàn toàn quy trình xử lý mâu thuẫn
+ADF/KPSS — loại bỏ yếu tố chủ quan, đảm bảo tái lập được (reproducible).
+Break point phát hiện được còn cung cấp thông tin bổ sung cho phân tích cấu
+trúc (structural analysis) ở Tầng 3–4.
+
+---
+
+### 2.3. Đối chiếu Chéo — Toda-Yamamoto vs Granger
 
 #### Bảng so sánh
 
@@ -232,9 +276,103 @@ $$
 
 ---
 
-## 4. Khả năng Kháng lỗi & Tự động hóa (Robustness)
+## 4. Tối ưu Đại số Tuyến tính — Eigenvalue Clamping (Under-the-hood)
 
-### 4.1. Kiến trúc 4 Tầng Cách ly — Zero Look-ahead Bias
+### 4.1. Vấn đề: Phân rã Cholesky Thất bại trên Mẫu nhỏ
+
+Khi tính khoảng tin cậy dự báo, pipeline cần phân rã Cholesky ma trận hiệp
+phương sai innovation $\Sigma_u$ (4×4, ước lượng từ phần dư VECM). Với mẫu
+cực nhỏ ($N = 10$), $\Sigma_u$ có thể **suy biến** (eigenvalue $\leq 0$) →
+Cholesky crash → pipeline dừng trước khi tạo được kết quả dự báo.
+
+#### Bảng so sánh
+
+| Tiêu chí | Phương pháp Truyền thống | Phương án 3-A (Dự án) |
+|-----------|--------------------------|------------------------|
+| **Xử lý $\Sigma_u$ suy biến** | Crash + thông báo lỗi thủ công | Tự phát hiện + Eigenvalue Clamping tự động |
+| **Phương pháp regularization** | Ridge: $\Sigma_u + \varepsilon I$ (tác động MỌI chiều) | Spectral Clamping: $V \tilde{\Lambda} V^T$ (chỉ sửa chiều lỗi) |
+| **Ảnh hưởng CI** | Ridge phóng đại CI cho TẤT CẢ biến | Clamping chỉ mở rộng CI cho chiều suy biến |
+| **Chọn $\varepsilon$** | Phải chọn trước (arbitrary) | Tự động: $\max|\lambda| \times 10^{-8}$ |
+| **Audit trail** | Không ghi nhận | WARNING log với eigenvalue gốc + sau clamping |
+
+#### Phân tích chuyên sâu
+
+**Quy trình Eigenvalue Clamping:**
+
+```
+1. Phân rã spectral:    Σ_u = V · Λ · V^T     (numpy.linalg.eigh)
+2. Kẹp eigenvalue:      λ̃ᵢ = max(λᵢ, max|λ| × 10⁻⁸)
+3. Tái tạo:             Σ̃_u = V · Λ̃ · V^T    (xác định dương, đảm bảo)
+4. Cholesky thành công:  Σ̃_u = L · L'
+```
+
+**Tại sao tốt hơn Ridge ($+\varepsilon I$):**
+- Ridge dịch TẤT CẢ eigenvalue lên $\varepsilon$ — kể cả chiều khỏe mạnh →
+  phóng đại phương sai giả cho mọi biến → CI rộng hơn cần thiết.
+- Eigenvalue Clamping chỉ nâng eigenvalue vi phạm, giữ nguyên eigenvector (cấu
+  trúc tương quan) → **tối thiểu can thiệp** (minimal intervention).
+- Trong bối cảnh mẫu nhỏ ($N = 10$) nơi mỗi phần trăm phương sai đều quan
+  trọng cho khoảng tin cậy, tránh artifact variance inflation là ưu tiên cao.
+
+**Self-healing:** Pipeline ghi `WARNING` khi phát hiện eigenvalue $\leq 0$,
+log eigenvalue trước/sau clamping, và tiếp tục chạy tự động — không cần can
+thiệp thủ công. Đây là cơ chế **tự phục hồi** (self-healing) hiếm thấy trong
+pipeline nghiên cứu.
+
+---
+
+## 5. Quản lý Trạng thái Pipeline — JSON Contract + Checkpoint/Resume
+
+### 5.1. JSON Contract: Hợp đồng Dữ liệu giữa các Phase
+
+Mỗi Phase ghi kết quả vào file JSON/CSV đóng vai trò **hợp đồng** (contract)
+với Phase tiếp theo — Phase sau đọc tham số từ JSON thay vì hard-code:
+
+```
+Phase 1 → reports/phase1_stationarity.json    → Phase 2, 3 đọc d(i)
+Phase 3 → reports/phase3_cointegration.json   → Phase 4 đọc coint_rank, k_ar_diff
+Phase 0 → data/processed/causal_weekly_dataset.csv → Mọi Phase sau đều đọc
+```
+
+#### Bảng so sánh
+
+| Tiêu chí | Pipeline Truyền thống | Phương án 3-A (Dự án) |
+|-----------|----------------------|------------------------|
+| **Truyền tham số** | Hard-code hoặc global variable | JSON contract: đọc từ file, validate schema |
+| **Khả năng resume** | Chạy lại từ đầu khi gián đoạn | `--resume-from`: bỏ qua Phase đã xong |
+| **Truy vết lịch sử** | Không có | `phase_transitions.jsonl`: mỗi dòng 1 transition event |
+| **Phát hiện thiếu Phase** | Crash không rõ ràng | Kiểm tra file existence + non-empty trước khi skip |
+
+### 5.2. Checkpoint/Resume (`--resume-from`)
+
+Orchestrator `main_pipeline.py` hỗ trợ tiếp tục pipeline từ Phase bất kỳ:
+
+```bash
+# Dừng sau Phase 1 (debug kiểm định tính dừng)
+python main_pipeline.py --stop-after phase1
+
+# Tiếp tục từ Phase 3 (Phase 0, 1 đã có output)
+python main_pipeline.py --resume-from phase3
+```
+
+**Cơ chế:** Mỗi Phase có **file output kỳ vọng** — khi `--resume-from` được
+truyền, pipeline kiểm tra file: tồn tại + không rỗng → bỏ qua (status =
+`skipped (resume)`); không tồn tại → chạy lại Phase đó (không crash).
+
+**Nhật ký chuyển tiếp:** `reports/logs/phase_transitions.jsonl` ghi mỗi sự
+kiện chuyển Phase (Phase nào → Phase nào, thời gian, status, thời gian chạy)
+— phục vụ audit trail và phân tích hiệu suất pipeline.
+
+**Ý nghĩa thực tiễn:**
+- **Debug**: chạy lại chỉ Phase lỗi, không tốn thời gian cho Phase đã đúng.
+- **Phát triển**: sửa code Phase 3 → chỉ chạy Phase 3 → kiểm tra ngay.
+- **Vận hành**: mất điện giữa Phase 2 → resume từ Phase 3 khi khôi phục.
+
+---
+
+## 6. Khả năng Kháng lỗi & Tự động hóa (Robustness)
+
+### 6.1. Kiến trúc 4 Tầng Cách ly — Zero Look-ahead Bias
 
 #### Bảng so sánh
 
@@ -280,7 +418,7 @@ $$
 ╚══════════════════════════════════════════════════════════════════╝
 ```
 
-### 4.2. Chuỗi An toàn (Defensive Chain) — Từ Raw → Forecast
+### 6.2. Chuỗi An toàn (Defensive Chain) — Từ Raw → Forecast
 
 | Bước | Cơ chế An toàn | Hậu quả nếu THIẾU |
 |:----:|----------------|-------------------|
@@ -291,7 +429,7 @@ $$
 | Tầng 4 | `_safe_float()` cho numpy → JSON | `json.dump` crash trên `numpy.bool_` |
 | Tầng 4 | Fallback CI: IRF → $\sqrt{h}$ approximation | Crash khi IRF thất bại (matrix not positive definite) |
 
-### 4.3. Sensitivity Analysis Toàn tuyến (End-to-end Robustness Check)
+### 6.3. Sensitivity Analysis Toàn tuyến (End-to-end Robustness Check)
 
 Mỗi Phase đều chạy **phân tích độ nhạy** bằng cách loại tuần nội suy:
 
@@ -322,9 +460,11 @@ $$
 │  ┌─── Tầng 1-2 ───┐  ┌──── Tầng 3 ────┐  ┌──── Tầng 4 ────┐  │
 │  │ • Jaccard Index │  │ • Dual Confirm  │  │ • k=0 (DoF)    │  │
 │  │ • SHA-256 audit │  │   (ADF + KPSS)  │  │ • IRF/MA CI    │  │
-│  │ • Nội suy limit │  │ • Cross-check   │  │ • Fallback √h  │  │
-│  │ • is_interp cờ  │  │   (Granger +    │  │ • Safe float   │  │
-│  │ • Fallback /0   │  │    Toda-Yama.)  │  │ • JSON params  │  │
+│  │ • Forward-fill  │  │ • ZA tiebreaker │  │ • Eigenvalue    │  │
+│  │   limit=4 + cờ  │  │   (struct break)│  │   Clamping      │  │
+│  │ • Nội suy limit │  │ • Cross-check   │  │ • Fallback √h   │  │
+│  │ • is_interp cờ  │  │   (Granger +    │  │ • Safe float    │  │
+│  │ • Fallback /0   │  │    Toda-Yama.)  │  │ • JSON params   │  │
 │  └────────┬────────┘  └───────┬─────────┘  └───────┬────────┘  │
 │           │                   │                     │           │
 │           └─────── Sensitivity Analysis ────────────┘           │
@@ -332,6 +472,7 @@ $$
 │                                                                 │
 │  ═══════════════════════════════════════════════════════════════  │
 │  XUYÊN SUỐT: Zero Look-ahead Bias │ Full Audit Trail │ JSON I/O │
+│              Checkpoint/Resume (--resume-from) │ Self-healing    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -339,8 +480,10 @@ $$
 
 ## Tham khảo
 
+- Enders, W. (2014). *Applied Econometric Time Series* (4th ed.). Wiley.
 - Johansen, S. (1995). *Likelihood-Based Inference in Cointegrated VAR Models*. Oxford UP.
+- Kwiatkowski, D. et al. (1992). Testing the Null of Stationarity. *J. Econometrics*, 54, 159–178.
 - Lütkepohl, H. (2005). *New Introduction to Multiple Time Series Analysis*. Springer.
 - Pfaff, B. (2008). *Analysis of Integrated and Cointegrated Time Series with R*. Springer.
 - Toda, H. Y. & Yamamoto, T. (1995). Statistical Inference in VARs with Possibly Integrated Processes. *J. Econometrics*, 66, 225–250.
-- Kwiatkowski, D. et al. (1992). Testing the Null of Stationarity. *J. Econometrics*, 54, 159–178.
+- Zivot, E. & Andrews, D. W. K. (1992). Further Evidence on the Great Crash, the Oil-Price Shock, and the Unit-Root Hypothesis. *J. Bus. & Econ. Stat.*, 10(3), 251–270.

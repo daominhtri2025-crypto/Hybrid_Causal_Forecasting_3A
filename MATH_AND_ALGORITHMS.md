@@ -219,7 +219,78 @@ Trong đó:
 **Đối với Revenue và OrderVolume (tổng/đếm):** Dùng `fillna(0)` — "không có giao dịch"
 là thông tin hợp lệ (giá trị 0 có ý nghĩa kinh tế thật).
 
-### 2.4. Chuyển đổi Ngày → Tuần ISO (Week Start — Monday)
+### 2.4. Forward-fill Khoảng trống Thời gian (Gap Handling — Strategy A)
+
+Khi gộp đơn hàng theo tuần, chuỗi thời gian có thể **thiếu tuần** (tuần không
+có đơn hàng nào hoàn thành). Chiến lược Forward-fill có giới hạn (Strategy A)
+xử lý khoảng trống này mà không tạo thêm bias:
+
+#### Bước 1: Reindex về lưới thời gian đều đặn
+
+$$
+\mathcal{T}_{\text{full}} = \{t_0, t_0 + 7\text{d}, t_0 + 14\text{d}, \ldots, t_N\}
+\quad \text{với } t_0 = \min(\text{week\_start}), \ t_N = \max(\text{week\_start})
+$$
+
+Tạo lưới tuần đều đặn (`freq='W-MON'`) bao phủ toàn bộ khoảng thời gian quan sát.
+Tuần nào không có dữ liệu gốc sẽ nhận giá trị NaN.
+
+#### Bước 2: Forward-fill có giới hạn
+
+$$
+\hat{y}_t = \begin{cases}
+y_{t^*} & \text{nếu } t - t^* \leq L \cdot \Delta_w \\
+\text{NaN} & \text{nếu } t - t^* > L \cdot \Delta_w
+\end{cases}
+$$
+
+Trong đó:
+- $y_{t^*}$: giá trị quan sát gần nhất **trước** $t$ (last observed value).
+- $L = 4$ (tuần): giới hạn forward-fill tối đa.
+- $\Delta_w = 7$ ngày: bước thời gian 1 tuần.
+- Khoảng trống $> L$ tuần được giữ nguyên NaN — là **structural gap**, không nên
+  nội suy.
+
+#### Tại sao Forward-fill thay vì Linear Interpolation cho DelayRate?
+
+Forward-fill phù hợp hơn nội suy tuyến tính cho `DelayRate` vì 3 lý do:
+
+1. **Bản chất tỷ lệ rời rạc:** `DelayRate` = số đơn hàng trễ / tổng đơn hàng
+   trong tuần — đây là tỷ lệ rời rạc, không phải đại lượng liên tục. Nội suy
+   tuyến tính giả định xu hướng chuyển tiếp mượt giữa 2 điểm — giả định không
+   hợp lệ cho tỷ lệ nhị thức (binomial proportion).
+
+2. **Ý nghĩa kinh tế của "tuần trống":** Khi tuần $t$ không có đơn hàng hoàn
+   thành, trạng thái hệ thống sản xuất không thay đổi — `DelayRate` tại $t$
+   phản ánh trạng thái cuối cùng được quan sát ($t^*$), không phải giá trị
+   nội suy giữa hai điểm xa nhau.
+
+3. **Tránh giả xu hướng (spurious trend):** Nội suy tuyến tính tạo xu hướng
+   nhân tạo giữa 2 điểm — nếu tuần $t_1$ có `DelayRate = 0.3` và tuần $t_3$
+   có `DelayRate = 0.1`, nội suy gán $t_2 = 0.2$ — giá trị này KHÔNG phản ánh
+   bất kỳ quan sát thực nào mà tạo ấn tượng giả về xu hướng giảm đều.
+
+#### Bước 3: Đánh dấu minh bạch
+
+Cột `is_filled` (boolean) ghi nhận mọi dòng được forward-fill:
+
+$$
+\text{is\_filled}_t = \begin{cases}
+\text{True} & \text{nếu } y_t \text{ gốc là NaN AND } \hat{y}_t \neq \text{NaN} \\
+\text{False} & \text{ngược lại}
+\end{cases}
+$$
+
+Tầng 3 (Phase 1 trở đi) sử dụng cờ này cho phân tích độ nhạy: chạy lại kiểm
+định trên tập dữ liệu loại tuần `is_filled = True` để đánh giá tác động
+forward-fill lên kết luận thống kê.
+
+> **Tham chiếu:** Chiến lược forward-fill có giới hạn phù hợp với khuyến nghị
+> của Enders (2014) về xử lý missing observations trong chuỗi thời gian ngắn:
+> ưu tiên phương pháp bảo toàn phân phối gốc (distribution-preserving) thay vì
+> phương pháp tạo giá trị mới (value-generating) như nội suy.
+
+### 2.5. Chuyển đổi Ngày → Tuần ISO (Week Start — Monday)
 
 $$
 \text{week\_start}(d) = d - \text{weekday}(d) \cdot \Delta_{\text{day}}
@@ -295,6 +366,52 @@ Trong đó:
 |---|---|---|
 | **ADF bác bỏ $H_0$ (dừng)** | ✅ Xác nhận **DỪNG** | ⚠ Mâu thuẫn (có thể trend-stationary) |
 | **ADF giữ $H_0$ (không dừng)** | ❓ Không kết luận (power thấp) | ✅ Xác nhận **KHÔNG DỪNG** |
+
+#### Xử lý Case 3 (Mâu thuẫn): Kiểm định Zivot-Andrews (1992) làm Tiebreaker
+
+Khi ADF và KPSS cho kết quả **mâu thuẫn** (Case 3: ADF bác bỏ unit root NHƯNG
+KPSS cũng bác bỏ stationarity), pipeline tự động chạy kiểm định
+**Zivot-Andrews** làm tiebreaker. Trường hợp này thường xảy ra khi chuỗi dừng
+quanh một **structural break** — ADF phát hiện mean-reversion nhưng KPSS phát
+hiện sự thay đổi mức.
+
+**Mô hình Zivot-Andrews (Model A — intercept break):**
+
+$$
+y_t = \hat{\mu} + \hat{\theta} \cdot DU_t(\hat{T}_B) + \hat{\beta} \cdot t + \hat{\alpha} \cdot y_{t-1} + \sum_{j=1}^{k} \hat{c}_j \, \Delta y_{t-j} + \hat{e}_t
+$$
+
+Trong đó:
+- $DU_t(T_B) = \mathbb{1}[t > T_B]$: biến giả (dummy) cho structural break
+  tại thời điểm $T_B$.
+- $T_B$: **break point nội sinh** — ZA tìm $T_B$ tối ưu bằng cách chạy hồi
+  quy cho MỌI vị trí $T_B$ khả thi (loại 15% đầu/cuối chuỗi) và chọn $T_B$
+  cho thống kê $t(\hat{\alpha})$ nhỏ nhất (most negative).
+- $\hat{\alpha}$: hệ số cần kiểm định. $H_0: \alpha = 1$ (unit root).
+
+**Thống kê kiểm định:**
+
+$$
+t_{ZA} = \min_{T_B} \frac{\hat{\alpha}(T_B) - 1}{\text{SE}(\hat{\alpha}(T_B))}
+$$
+
+**Quy tắc quyết định trong pipeline:**
+
+$$
+\text{Case 3 resolution} = \begin{cases}
+\text{stationary (break-adjusted)} & \text{nếu } p_{ZA} < 0.05 \\
+\text{contradictory (conservative)} & \text{nếu } p_{ZA} \geq 0.05 \\
+\text{contradictory (fallback)} & \text{nếu ZA thất bại (mẫu quá nhỏ)}
+\end{cases}
+$$
+
+Khi ZA bác bỏ $H_0$ → chuỗi dừng quanh break → kết luận **stationary** (chuỗi
+dừng có structural break). Khi ZA không bác bỏ → giữ **contradictory**, tạm xử
+lý như dừng (bảo thủ) — tránh over-differencing.
+
+> **Tham chiếu:** Zivot, E. & Andrews, D. W. K. (1992). Further evidence on the
+> Great Crash, the oil-price shock, and the unit-root hypothesis. *Journal of
+> Business & Economic Statistics*, 10(3), 251–270.
 
 **Bậc tích hợp $d(i)$:** Sai phân tuần tự cho đến khi chuỗi dừng. Ký hiệu: chuỗi $y_t \sim I(d)$ nếu $\Delta^d y_t$ dừng và $\Delta^{d-1} y_t$ không dừng.
 
@@ -585,16 +702,126 @@ Trong đó:
 
 ---
 
-## 5. Tham khảo (References)
+## 5. Eigenvalue Clamping — Xử lý Ma trận Hiệp phương sai Suy biến
+
+### 5.1. Vấn đề: $\Sigma_u$ Không Xác định Dương (Non-Positive Definite)
+
+Khi tính khoảng tin cậy dự báo (mục 4.5), pipeline cần thực hiện **phân rã
+Cholesky** trên ma trận hiệp phương sai innovation $\Sigma_u$:
+
+$$
+\Sigma_u = L \cdot L'
+$$
+
+Phân rã Cholesky yêu cầu $\Sigma_u$ phải **xác định dương** (positive definite),
+tức mọi eigenvalue $\lambda_i > 0$. Tuy nhiên, với mẫu cực nhỏ ($N = 10$), ma
+trận $\Sigma_u$ ước lượng từ phần dư VECM có thể:
+
+1. **Gần suy biến** (near-singular): một hoặc nhiều $\lambda_i \approx 0$ do
+   rank thiếu (rank deficiency) — xảy ra khi số quan sát gần bằng số biến.
+2. **Suy biến thực sự**: $\lambda_i \leq 0$ do lỗi số học (numerical error)
+   trong quá trình ước lượng OLS/MLE.
+
+Khi $\Sigma_u$ không xác định dương → `np.linalg.cholesky()` raise
+`LinAlgError` → pipeline crash trước khi tạo được khoảng tin cậy.
+
+### 5.2. Phương pháp: Phân rã Spectral + Kẹp Eigenvalue (Eigenvalue Clamping)
+
+#### Bước 1: Phân rã Spectral (Eigendecomposition)
+
+$$
+\Sigma_u = V \cdot \Lambda \cdot V^T
+$$
+
+Trong đó:
+- $V \in \mathbb{R}^{n \times n}$: ma trận trực giao chứa các eigenvector.
+- $\Lambda = \text{diag}(\lambda_1, \lambda_2, \ldots, \lambda_n)$: ma trận
+  đường chéo chứa các eigenvalue.
+
+Pipeline dùng `numpy.linalg.eigh()` (cho ma trận đối xứng) — thuật toán ổn
+định hơn `numpy.linalg.eig()` cho ma trận hiệp phương sai.
+
+#### Bước 2: Kẹp (Clamping) eigenvalue không hợp lệ
+
+$$
+\tilde{\lambda}_i = \max(\lambda_i, \, \epsilon_{\text{floor}})
+$$
+
+Trong đó:
+
+$$
+\epsilon_{\text{floor}} = \max(|\lambda_1|, |\lambda_2|, \ldots, |\lambda_n|) \times 10^{-8}
+$$
+
+Mọi eigenvalue $\leq 0$ hoặc quá nhỏ được nâng lên $\epsilon_{\text{floor}}$
+— một giá trị **tương đối** so với eigenvalue lớn nhất, đảm bảo tỉ lệ điều
+kiện (condition number) không vượt $10^8$.
+
+#### Bước 3: Tái tạo ma trận xác định dương
+
+$$
+\tilde{\Sigma}_u = V \cdot \tilde{\Lambda} \cdot V^T
+$$
+
+Với $\tilde{\Lambda} = \text{diag}(\tilde{\lambda}_1, \ldots, \tilde{\lambda}_n)$.
+Ma trận $\tilde{\Sigma}_u$ đảm bảo:
+- **Xác định dương**: mọi $\tilde{\lambda}_i > 0$.
+- **Đối xứng**: bảo toàn từ phân rã spectral.
+- **Gần $\Sigma_u$ gốc**: chỉ điều chỉnh eigenvalue vi phạm, giữ nguyên
+  eigenvector (cấu trúc tương quan giữa các biến).
+
+#### Bước 4: Phân rã Cholesky thành công
+
+$$
+\tilde{\Sigma}_u = \tilde{L} \cdot \tilde{L}'
+$$
+
+Cholesky bây giờ **luôn thành công** trên $\tilde{\Sigma}_u$.
+
+### 5.3. So sánh với Ridge Regularization (Tikhonov — $\Sigma_u + \varepsilon I$)
+
+Phương pháp Ridge (còn gọi là Tikhonov regularization) thêm $\varepsilon I$
+vào toàn bộ đường chéo:
+
+$$
+\Sigma_u^{\text{Ridge}} = \Sigma_u + \varepsilon \cdot I_n
+$$
+
+**Bảng so sánh:**
+
+| Tiêu chí | Ridge ($+\varepsilon I$) | Eigenvalue Clamping ($V\tilde{\Lambda}V^T$) |
+|---|---|---|
+| **Tác động lên eigenvalue hợp lệ** | Dịch chuyển TẤT CẢ $\lambda_i$ lên $\varepsilon$ — phóng đại phương sai ngay cả cho chiều không suy biến | Chỉ sửa $\lambda_i$ vi phạm — eigenvalue hợp lệ KHÔNG bị ảnh hưởng |
+| **Ảnh hưởng CI** | Khoảng tin cậy rộng hơn cần thiết cho MỌI biến | CI chỉ rộng hơn cho chiều suy biến |
+| **Chọn $\varepsilon$** | Phải chọn trước (arbitrary) hoặc cross-validate | Tự động từ dữ liệu: $\epsilon_{\text{floor}} = \max|\lambda| \times 10^{-8}$ |
+| **Bảo toàn cấu trúc tương quan** | Sai lệch: $\varepsilon I$ thay đổi tỉ lệ eigenvalue → correlation structure bị nhiễu | Bảo toàn eigenvector → cấu trúc tương quan giữ nguyên |
+| **Ổn định số học** | Tốt | Tốt — $\epsilon_{\text{floor}}$ đảm bảo condition number $\leq 10^8$ |
+
+**Kết luận:** Eigenvalue Clamping là phương pháp **tối thiểu can thiệp**
+(minimal intervention) — chỉ sửa chính xác chiều suy biến mà không gây tác
+dụng phụ lên các chiều khỏe mạnh. Trong bối cảnh mẫu nhỏ ($N = 10$) nơi mỗi
+phần trăm phương sai đều quan trọng cho khoảng tin cậy, việc tránh phóng đại
+phương sai giả (artifact variance inflation) là ưu tiên cao.
+
+> **Ghi chú tự phục hồi (Self-healing):** Pipeline ghi `WARNING` khi phát hiện
+> eigenvalue $\leq 0$ và thực hiện clamping — log message bao gồm eigenvalue gốc
+> và giá trị sau clamping để kiểm toán. Quá trình hoàn toàn tự động, không cần
+> can thiệp thủ công.
+
+---
+
+## 6. Tham khảo (References)
 
 1. Dickey, D. A., & Fuller, W. A. (1979). Distribution of the Estimators for Autoregressive Time Series with a Unit Root. *JASA*, 74(366), 427–431.
-2. Engle, R. F., & Granger, C. W. J. (1987). Co-Integration and Error Correction: Representation, Estimation, and Testing. *Econometrica*, 55(2), 251–276.
-3. Granger, C. W. J. (1969). Investigating Causal Relations by Econometric Models and Cross-spectral Methods. *Econometrica*, 37(3), 424–438.
-4. Jaccard, P. (1901). Distribution de la flore alpine dans le bassin des Dranses. *Bulletin de la Société Vaudoise des Sciences Naturelles*, 37, 241–272.
-5. Johansen, S. (1991). Estimation and Hypothesis Testing of Cointegration Vectors in Gaussian Vector Autoregressive Models. *Econometrica*, 59(6), 1551–1580.
-6. Johansen, S. (1995). *Likelihood-Based Inference in Cointegrated Vector Autoregressive Models*. Oxford University Press.
-7. Kwiatkowski, D., Phillips, P. C. B., Schmidt, P., & Shin, Y. (1992). Testing the Null Hypothesis of Stationarity against the Alternative of a Unit Root. *Journal of Econometrics*, 54(1–3), 159–178.
-8. Lütkepohl, H. (2005). *New Introduction to Multiple Time Series Analysis*. Springer.
-9. NIST (2015). *Secure Hash Standard (SHS)*. FIPS PUB 180-4.
-10. Pfaff, B. (2008). *Analysis of Integrated and Cointegrated Time Series with R* (2nd ed.). Springer.
-11. Toda, H. Y., & Yamamoto, T. (1995). Statistical Inference in Vector Autoregressions with Possibly Integrated Processes. *Journal of Econometrics*, 66(1–2), 225–250.
+2. Enders, W. (2014). *Applied Econometric Time Series* (4th ed.). Wiley.
+3. Engle, R. F., & Granger, C. W. J. (1987). Co-Integration and Error Correction: Representation, Estimation, and Testing. *Econometrica*, 55(2), 251–276.
+4. Granger, C. W. J. (1969). Investigating Causal Relations by Econometric Models and Cross-spectral Methods. *Econometrica*, 37(3), 424–438.
+5. Jaccard, P. (1901). Distribution de la flore alpine dans le bassin des Dranses. *Bulletin de la Société Vaudoise des Sciences Naturelles*, 37, 241–272.
+6. Johansen, S. (1991). Estimation and Hypothesis Testing of Cointegration Vectors in Gaussian Vector Autoregressive Models. *Econometrica*, 59(6), 1551–1580.
+7. Johansen, S. (1995). *Likelihood-Based Inference in Cointegrated Vector Autoregressive Models*. Oxford University Press.
+8. Kwiatkowski, D., Phillips, P. C. B., Schmidt, P., & Shin, Y. (1992). Testing the Null Hypothesis of Stationarity against the Alternative of a Unit Root. *Journal of Econometrics*, 54(1–3), 159–178.
+9. Lütkepohl, H. (2005). *New Introduction to Multiple Time Series Analysis*. Springer.
+10. NIST (2015). *Secure Hash Standard (SHS)*. FIPS PUB 180-4.
+11. Pfaff, B. (2008). *Analysis of Integrated and Cointegrated Time Series with R* (2nd ed.). Springer.
+12. Toda, H. Y., & Yamamoto, T. (1995). Statistical Inference in Vector Autoregressions with Possibly Integrated Processes. *Journal of Econometrics*, 66(1–2), 225–250.
+13. Zivot, E., & Andrews, D. W. K. (1992). Further Evidence on the Great Crash, the Oil-Price Shock, and the Unit-Root Hypothesis. *Journal of Business & Economic Statistics*, 10(3), 251–270.

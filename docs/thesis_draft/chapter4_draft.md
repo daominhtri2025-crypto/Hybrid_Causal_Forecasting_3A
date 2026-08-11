@@ -9,6 +9,25 @@
 
 ## 4.1. Kiểm định tính dừng và bậc tích hợp (Phase 1)
 
+### 4.1.0. Tiền xử lý chuỗi thời gian — Forward-fill có giới hạn
+
+Trước khi kiểm định tính dừng, dữ liệu tuần từ Phase 0 được xử lý khoảng trống
+thời gian (tuần không có đơn hàng nào hoàn thành) theo chiến lược forward-fill
+có giới hạn (Strategy A). Chuỗi tuần được reindex về lưới đều đặn (`freq='W-MON'`),
+sau đó áp dụng `ffill(limit=4)` — tối đa 4 tuần liên tiếp được lấp bằng giá trị
+quan sát gần nhất. Khoảng trống vượt 4 tuần ($\approx$ 1 tháng) được giữ nguyên NaN
+vì đây là structural gap có thể phản ánh ngừng sản xuất hoặc thay đổi cơ cấu —
+forward-fill sẽ tạo bias.
+
+Phương pháp forward-fill được ưu tiên so với nội suy tuyến tính (linear interpolation)
+cho biến `DelayRate` vì ba lý do: (i) `DelayRate` là tỷ lệ rời rạc (binomial
+proportion), nội suy tuyến tính giả định xu hướng chuyển tiếp mượt — giả định
+không phù hợp cho đại lượng nhị thức; (ii) tuần trống phản ánh trạng thái sản
+xuất không đổi, forward-fill bảo toàn ý nghĩa kinh tế này; (iii) nội suy tuyến
+tính tạo xu hướng nhân tạo (spurious trend) giữa hai điểm xa nhau, có thể ảnh
+hưởng đến kiểm định tính dừng. Mỗi giá trị forward-fill được đánh dấu bằng cờ
+`is_filled = True` phục vụ phân tích độ nhạy ở các Phase tiếp theo (Enders, 2014).
+
 ### 4.1.1. Phương pháp kiểm định
 
 Nghiên cứu áp dụng chiến lược xác nhận kép ADF + KPSS (Pfaff, 2008) để xác
@@ -19,6 +38,21 @@ nhằm giảm thiểu sai lầm loại I/II khi chỉ dùng một kiểm định
 
 - **ADF** (Augmented Dickey-Fuller): hồi quy với hằng số, không xu hướng (`regression='c'`), độ trễ chọn tự động theo AIC.
 - **KPSS** (Kwiatkowski-Phillips-Schmidt-Shin): kiểm định dừng mức (`regression='c'`).
+
+Trong trường hợp hai kiểm định cho kết quả **mâu thuẫn** (Case 3: ADF bác bỏ
+$H_0$ nhưng KPSS cũng bác bỏ $H_0$), nghiên cứu áp dụng kiểm định
+**Zivot-Andrews** (Zivot & Andrews, 1992) làm tiebreaker. Kiểm định ZA mở rộng
+ADF bằng cách cho phép **một structural break nội sinh** (endogenous) trong mô
+hình hồi quy:
+
+$$y_t = \hat{\mu} + \hat{\theta} \cdot DU_t(\hat{T}_B) + \hat{\beta} \cdot t + \hat{\alpha} \cdot y_{t-1} + \sum_{j=1}^{k} \hat{c}_j \, \Delta y_{t-j} + \hat{e}_t$$
+
+trong đó $DU_t(T_B) = \mathbb{1}[t > T_B]$ là biến giả cho structural break tại
+thời điểm $T_B$, và $T_B$ được xác định nội sinh bằng cách tối thiểu hóa
+$t(\hat{\alpha})$ trên toàn bộ vị trí khả thi. Nếu ZA bác bỏ $H_0$ (unit root)
+tại mức ý nghĩa 5%, chuỗi được kết luận **dừng quanh structural break**
+(break-stationary); ngược lại, kết luận giữ trạng thái contradictory và tạm xử
+lý như dừng (bảo thủ) nhằm tránh over-differencing.
 
 ### 4.1.2. Kết quả kiểm định
 
@@ -407,8 +441,83 @@ Kết quả phân tích VECM gợi ý các hàm ý quản trị sản xuất sau
 
 ---
 
+## 4.8. Xử lý suy biến hiệp phương sai mẫu nhỏ — Eigenvalue Clamping
+
+### 4.8.1. Bối cảnh vấn đề
+
+Khoảng tin cậy dự báo VECM (Bảng 4.10) được tính dựa trên biểu diễn MA
+(Moving Average) của sai số dự báo (Lütkepohl, 2005, Mục 6.5), đòi hỏi phân
+rã Cholesky ma trận hiệp phương sai innovation $\Sigma_u \in \mathbb{R}^{4 \times 4}$
+ước lượng từ phần dư VECM. Phân rã Cholesky yêu cầu $\Sigma_u$ phải xác định
+dương (positive definite), tức mọi eigenvalue $\lambda_i > 0$.
+
+Với cỡ mẫu hiệu dụng $T = 374$ quan sát (hoặc $T \approx 10$ trong bối cảnh
+mẫu nhỏ pilot), ma trận $\hat{\Sigma}_u$ ước lượng có thể xuất hiện eigenvalue
+cận zero hoặc âm do: (i) thiếu rank (rank deficiency) khi $T$ gần $n$; (ii) lỗi
+số học tích lũy (floating-point accumulation) trong quá trình ước lượng MLE.
+Trong cả hai trường hợp, Cholesky decomposition thất bại ($\texttt{LinAlgError}$)
+và pipeline không thể tạo khoảng tin cậy.
+
+### 4.8.2. Phương pháp Eigenvalue Clamping
+
+Nghiên cứu áp dụng phương pháp **spectral correction** (hiệu chỉnh spectral)
+thay vì Ridge regularization ($\Sigma_u + \varepsilon I$) phổ biến trong tài
+liệu (Tikhonov, 1943). Quy trình gồm 4 bước:
+
+**Bước 1 — Phân rã spectral:**
+
+$$\hat{\Sigma}_u = V \Lambda V^T, \quad \Lambda = \text{diag}(\lambda_1, \ldots, \lambda_n)$$
+
+sử dụng `numpy.linalg.eigh()` cho ma trận đối xứng — đảm bảo ổn định số học
+tốt hơn `numpy.linalg.eig()`.
+
+**Bước 2 — Kẹp eigenvalue (clamping):**
+
+$$\tilde{\lambda}_i = \max\left(\lambda_i, \, \epsilon_{\text{floor}}\right), \quad \epsilon_{\text{floor}} = \max_j |\lambda_j| \times 10^{-8}$$
+
+Mọi eigenvalue $\leq 0$ hoặc quá nhỏ được nâng lên $\epsilon_{\text{floor}}$
+— một ngưỡng **tương đối** (relative threshold) so với eigenvalue lớn nhất,
+đảm bảo condition number $\kappa(\tilde{\Sigma}_u) \leq 10^8$.
+
+**Bước 3 — Tái tạo:**
+
+$$\tilde{\Sigma}_u = V \cdot \tilde{\Lambda} \cdot V^T$$
+
+Ma trận $\tilde{\Sigma}_u$ đảm bảo xác định dương, đối xứng, và bảo toàn
+eigenvector gốc (cấu trúc tương quan giữa các biến).
+
+**Bước 4 — Cholesky:** $\tilde{\Sigma}_u = \tilde{L} \cdot \tilde{L}'$ luôn
+thành công.
+
+### 4.8.3. So sánh với Ridge Regularization (Tikhonov)
+
+Phương pháp Ridge ($\hat{\Sigma}_u^{\text{Ridge}} = \hat{\Sigma}_u + \varepsilon I_n$)
+được sử dụng rộng rãi nhưng có hai hạn chế trong bối cảnh mẫu nhỏ:
+
+(i) **Tác động toàn cục:** Ridge dịch chuyển toàn bộ spectrum $\lambda_i \to \lambda_i + \varepsilon$, bao gồm cả chiều không suy biến — phóng đại phương sai cho mọi biến, dẫn đến khoảng tin cậy rộng hơn cần thiết.
+
+(ii) **Chọn $\varepsilon$ tùy ý:** Giá trị $\varepsilon$ thường được chọn ad-hoc (thường $10^{-6}$ hoặc $10^{-10}$) mà không phản ánh cấu trúc dữ liệu — quá nhỏ thì không giải quyết được suy biến, quá lớn thì bóp méo $\Sigma_u$.
+
+Eigenvalue Clamping khắc phục cả hai vấn đề: (i) chỉ can thiệp vào chiều vi
+phạm, giữ nguyên chiều khỏe mạnh — **tối thiểu can thiệp** (minimal
+intervention); (ii) ngưỡng $\epsilon_{\text{floor}}$ được xác định tự động từ
+dữ liệu (adaptive), không đòi hỏi tham số ngoại vi. Trong bối cảnh $N = 10$
+nơi mỗi phần trăm phương sai đều ảnh hưởng đáng kể đến khoảng tin cậy, tránh
+artifact variance inflation là ưu tiên cao.
+
+### 4.8.4. Ghi nhận và minh bạch
+
+Pipeline ghi `WARNING` trong log khi phát hiện eigenvalue $\leq 0$, bao gồm:
+giá trị eigenvalue gốc, giá trị sau clamping, và $\epsilon_{\text{floor}}$ được
+sử dụng. Quá trình hoàn toàn tự động (self-healing) — không yêu cầu can thiệp
+thủ công — đảm bảo pipeline không crash tại bước cuối cùng khi đã hoàn thành
+toàn bộ kiểm định econometric trước đó.
+
+---
+
 ## Tài liệu tham khảo
 
+- Enders, W. (2014). *Applied Econometric Time Series* (4th ed.). Wiley.
 - Johansen, S. (1995). *Likelihood-Based Inference in Cointegrated Vector
   Autoregressive Models*. Oxford University Press.
 - Lütkepohl, H. (2005). *New Introduction to Multiple Time Series Analysis*.
@@ -416,6 +525,11 @@ Kết quả phân tích VECM gợi ý các hàm ý quản trị sản xuất sau
 - Pfaff, B. (2008). *Analysis of Integrated and Cointegrated Time Series with R*
   (2nd ed.). Springer.
 - Sims, C.A. (1980). Macroeconomics and Reality. *Econometrica*, 48(1), 1–48.
+- Tikhonov, A. N. (1943). On the stability of inverse problems. *Doklady
+  Akademii Nauk SSSR*, 39(5), 195–198.
 - Toda, H.Y., & Yamamoto, T. (1995). Statistical Inference in Vector
   Autoregressions with Possibly Integrated Processes. *Journal of Econometrics*,
   66(1–2), 225–250.
+- Zivot, E., & Andrews, D. W. K. (1992). Further Evidence on the Great Crash,
+  the Oil-Price Shock, and the Unit-Root Hypothesis. *Journal of Business &
+  Economic Statistics*, 10(3), 251–270.

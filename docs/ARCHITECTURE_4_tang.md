@@ -132,7 +132,25 @@ coi mọi đơn hàng ngang nhau bất kể quy mô.
   3 biết dòng nào là dữ liệu thật, dòng nào là nội suy — phục vụ kiểm định độ
   nhạy (xem mục Tầng 3).
 
-**Output:** `data/processed/causal_weekly_dataset.csv` (có thêm cột `is_interpolated`).
+### 2.5. Forward-fill Khoảng trống Tuần (Strategy A)
+
+Khi gộp đơn hàng theo tuần, chuỗi có thể thiếu tuần (tuần không có đơn hàng
+nào hoàn thành). Chiến lược xử lý 3 bước:
+
+1. **Reindex** chuỗi tuần về lưới đều đặn (`freq='W-MON'`) bao phủ toàn bộ
+   khoảng thời gian — tuần thiếu nhận giá trị NaN.
+2. **Forward-fill** (`ffill`) tối đa **4 tuần liên tiếp** — giả định trạng
+   thái sản xuất không đổi trong ngắn hạn (≤ 1 tháng). Khoảng trống > 4 tuần
+   giữ NaN (structural gap, không nên nội suy).
+3. **Đánh dấu** cột `is_filled` (`True` = dòng được forward-fill) để Tầng 3
+   đánh giá tác động qua phân tích độ nhạy.
+
+**Tại sao forward-fill thay vì nội suy tuyến tính cho DelayRate:**
+- `DelayRate` là tỷ lệ rời rạc (binomial proportion) — nội suy tuyến tính tạo
+  xu hướng nhân tạo giữa 2 điểm (spurious trend).
+- Tuần trống = trạng thái không đổi → forward-fill phản ánh đúng ý nghĩa kinh tế.
+
+**Output:** `data/processed/causal_weekly_dataset.csv` (có thêm cột `is_interpolated` và `is_filled_delay`).
 
 ---
 
@@ -142,13 +160,20 @@ Giữ nguyên toàn bộ logic đã kiểm chứng chạy đúng ở Bước 3 (
 d(i) riêng từng biến, Granger trên chuỗi đã sai phân đúng bậc, Johansen theo
 đúng thủ tục tuần tự, Toda-Yamamoto đối chiếu chéo độc lập).
 
-**Bổ sung mới:** vì input giờ có cột `is_interpolated`, mỗi script Phase 2/3/3b
-chạy thêm một lượt **kiểm định độ nhạy tùy chọn** (loại bỏ các tuần có
-`is_interpolated=True`, chạy lại kiểm định trên tập dữ liệu "sạch"). Nếu kết
-luận (có ý nghĩa thống kê hay không, rank bao nhiêu) **thay đổi** giữa 2 lần
-chạy (đầy đủ vs. đã loại tuần nội suy) → ghi WARNING rõ ràng — đây là dấu
-hiệu kết luận có thể phụ thuộc vào chính bước nội suy ở Tầng 2, cần thận
-trọng khi đưa vào bản thảo.
+**Bổ sung mới — Zivot-Andrews Tiebreaker (Phase 1):** Khi ADF và KPSS cho kết
+quả mâu thuẫn (cả hai đều bác bỏ $H_0$ — Case 3), pipeline tự động chạy kiểm
+định Zivot-Andrews (1992) làm tiebreaker. ZA cho phép 1 structural break nội
+sinh — phát hiện chuỗi dừng quanh break mà ADF/KPSS đơn lẻ không phân giải
+được. Nếu ZA bác bỏ unit root → stationary; ngược lại → giữ contradictory.
+
+**Bổ sung mới — Sensitivity Analysis:** vì input giờ có cột `is_interpolated`
+và `is_filled`, mỗi script Phase 2/3/3b chạy thêm một lượt **kiểm định độ nhạy
+tùy chọn** (loại bỏ các tuần có `is_interpolated=True` hoặc `is_filled=True`,
+chạy lại kiểm định trên tập dữ liệu "sạch"). Nếu kết luận (có ý nghĩa thống
+kê hay không, rank bao nhiêu) **thay đổi** giữa 2 lần chạy (đầy đủ vs. đã
+loại tuần nội suy/forward-fill) → ghi WARNING rõ ràng — đây là dấu hiệu kết
+luận có thể phụ thuộc vào chính bước tiền xử lý ở Tầng 2, cần thận trọng khi
+đưa vào bản thảo.
 
 **Output:** `reports/phase1_stationarity.json`, `phase2_granger_causality.json`,
 `phase3_cointegration.json`, `phase3b_toda_yamamoto.json` (mỗi file kèm thêm
@@ -168,13 +193,40 @@ Giữ nguyên cơ chế đã xây dựng ở Bước 2–3:
 - **Phase 6** tổng hợp kết quả Phase 4 + Phase 5, không hard-code bất kỳ số
   liệu so sánh nào.
 
-**Bổ sung mới cho `main.py`:**
+**Bổ sung mới cho `main_pipeline.py`:**
+
+- **Quản lý trạng thái (State Management):** Mỗi Phase có file output kỳ vọng
+  (JSON contract) — orchestrator kiểm tra file existence + non-empty để xác
+  định Phase đã hoàn thành hay chưa.
+
+- **Checkpoint/Resume (`--resume-from`):** Cho phép tiếp tục pipeline từ Phase
+  bất kỳ — Phase trước điểm resume được bỏ qua nếu output đã tồn tại
+  (status = `skipped (resume)`). Hữu ích cho debug và phát triển.
+
+- **Nhật ký chuyển tiếp Phase:** `reports/logs/phase_transitions.jsonl` ghi
+  mỗi sự kiện chuyển Phase (JSONL, 1 dòng/event) — phục vụ audit trail.
+
 - Bọc mỗi lệnh gọi Phase trong `try/except`, dùng `logger.exception(...)` để
   ghi ERROR kèm traceback đầy đủ, và **dừng chuỗi (fail-fast)** — không chạy
   Phase sau nếu Phase trước lỗi.
 - Dừng đúng **2 điểm xác nhận** đã chốt: sau Tầng 2 (duyệt dataset tuần —
   số tuần, số tuần nội suy, khoảng thời gian) và sau Tầng 3 (duyệt route
   VECM/VAR trước khi tốn thời gian huấn luyện LSTM ở Tầng 4).
+
+**Bổ sung mới — Tự phục hồi (Self-healing) — Eigenvalue Clamping:**
+
+Khi tính khoảng tin cậy dự báo, ma trận hiệp phương sai $\Sigma_u$ (ước lượng
+từ phần dư VECM, mẫu nhỏ $N = 10$) có thể suy biến (eigenvalue $\leq 0$) →
+Cholesky decomposition thất bại. Pipeline tự phát hiện và xử lý:
+
+1. Phân rã spectral: $\Sigma_u = V \Lambda V^T$
+2. Kẹp eigenvalue vi phạm: $\tilde{\lambda}_i = \max(\lambda_i, \max|\lambda| \times 10^{-8})$
+3. Tái tạo: $\tilde{\Sigma}_u = V \tilde{\Lambda} V^T$ (xác định dương)
+4. Cholesky thành công trên $\tilde{\Sigma}_u$
+
+Toàn bộ quá trình tự động — ghi `WARNING` kèm eigenvalue trước/sau clamping,
+không cần can thiệp thủ công. Phương pháp này tốt hơn Ridge ($+\varepsilon I$)
+vì chỉ sửa chiều suy biến, không phóng đại phương sai cho chiều khỏe mạnh.
 
 **Output:** `models/lstm_*.pt`, `data/processed/lstm_predictions.csv`,
 `data/processed/figures/*.png`, `reports/phase4_metrics.json`,

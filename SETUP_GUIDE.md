@@ -265,6 +265,64 @@ python scripts/tang4_vecm_forecasting.py
 - Ước lượng mô hình VECM, tính dự báo 12 tuần + khoảng tin cậy 95%
 - Ghi kết quả ra `reports/` và `data/processed/figures/`
 
+### 4.2b. Orchestrator — `main_pipeline.py` (Khuyến nghị)
+
+Thay vì chạy từng script riêng lẻ, có thể sử dụng **orchestrator** để chạy
+toàn bộ pipeline tự động, bao gồm error handling và ghi nhật ký chuyển tiếp
+giữa các Phase:
+
+```bash
+python main_pipeline.py
+```
+
+#### Tham số dòng lệnh (CLI Arguments)
+
+| Tham số | Mô tả | Ví dụ |
+|---|---|---|
+| `--resume-from` | Tiếp tục pipeline từ Phase chỉ định — bỏ qua các Phase trước nếu output đã có | `--resume-from phase3` |
+| `--stop-after` | Dừng pipeline sau Phase chỉ định (không chạy Phase tiếp theo) | `--stop-after phase1` |
+
+#### Checkpoint/Resume — Tiếp tục từ Phase bất kỳ
+
+Cơ chế `--resume-from` cho phép **bỏ qua các Phase đã chạy thành công** —
+tiết kiệm thời gian khi debug hoặc phát triển Phase cụ thể:
+
+```bash
+# Chạy toàn bộ pipeline từ đầu
+python main_pipeline.py
+
+# Tiếp tục từ Phase 3 — Phase 0 và 1 được bỏ qua nếu output JSON/CSV đã tồn tại
+python main_pipeline.py --resume-from phase3
+
+# Chỉ chạy Phase 4
+python main_pipeline.py --resume-from phase4 --stop-after phase4
+```
+
+**Cơ chế hoạt động:**
+
+Mỗi Phase có **file output kỳ vọng** (JSON contract):
+
+| Phase | File output kỳ vọng |
+|---|---|
+| Phase 0 | `data/processed/causal_weekly_dataset.csv` |
+| Phase 1 | `reports/phase1_stationarity.json` |
+| Phase 2 | `reports/phase2_granger_causality.json` |
+| Phase 3 | `reports/phase3_cointegration.json` |
+| Phase 3b | `reports/phase3b_toda_yamamoto.json` |
+
+Khi `--resume-from` được truyền:
+1. Các Phase **trước** điểm resume sẽ kiểm tra file output: nếu tồn tại và
+   không rỗng → bỏ qua (status = `skipped (resume)`).
+2. Nếu file output không tồn tại → Phase đó **vẫn chạy** (không crash).
+3. Nhật ký chuyển tiếp được ghi vào `reports/logs/phase_transitions.jsonl`
+   (định dạng JSONL, 1 dòng/transition).
+
+**Lưu ý quan trọng:**
+- `--resume-from` **không đảm bảo** kết quả Phase trước vẫn hợp lệ — nếu đã
+  thay đổi dữ liệu đầu vào hoặc tham số, nên chạy lại từ đầu.
+- Dùng chủ yếu để **debug** và **phát triển** — trong production nên chạy
+  toàn bộ pipeline (`python main_pipeline.py` không có flag).
+
 ---
 
 ## 5. Kiểm tra đầu ra (Output)

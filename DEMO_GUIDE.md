@@ -248,6 +248,86 @@ open data/processed/figures/vecm_forecast.png
 
 ---
 
+### Bước 5: Khả năng Chịu lỗi & Quản lý Trạng thái — *"Hệ thống tự nhớ tiến trình"*
+
+**Thời lượng:** 3–4 phút
+
+**Thao tác:**
+
+```bash
+# Bước 1: Chạy pipeline nhưng DỪNG sau Phase 1
+python main_pipeline.py --stop-after phase1
+```
+
+**Lời thoại gợi ý:**
+
+> "Trong thực tế vận hành, pipeline có thể bị gián đoạn — do mất điện, lỗi
+> mạng, hoặc đơn giản là muốn kiểm tra kết quả trung gian trước khi tiếp tục.
+>
+> Tôi vừa chạy pipeline với `--stop-after phase1` — hệ thống xử lý xong Phase 0
+> và Phase 1 rồi dừng có kiểm soát."
+
+```bash
+# Bước 2: Xác nhận output trung gian đã tồn tại
+ls reports/phase1_stationarity.json
+
+# Bước 3: Tiếp tục pipeline từ Phase 3 — bỏ qua Phase 0 và 1
+python main_pipeline.py --resume-from phase3
+```
+
+> "Bây giờ tôi chạy tiếp bằng `--resume-from phase3`. Hệ thống kiểm tra file
+> JSON output của Phase 0, 1 — thấy đã tồn tại và không rỗng → tự động BỎ QUA
+> hai Phase này, chỉ chạy từ Phase 3 trở đi.
+>
+> *(chỉ vào dòng log 'skipped (resume)')*
+>
+> Đây là cơ chế **JSON Contract**: mỗi Phase ghi kết quả vào file JSON —
+> Phase sau đọc JSON đó làm input. File JSON vừa là output, vừa là 'chứng chỉ
+> hoàn thành' (proof of completion). Không có JSON → Phase chưa chạy → pipeline
+> TỰ ĐỘNG chạy lại Phase đó thay vì crash.
+>
+> Nhật ký chuyển tiếp giữa các Phase được ghi vào
+> `reports/logs/phase_transitions.jsonl` — mỗi dòng là 1 sự kiện chuyển Phase,
+> dùng để truy vết lịch sử chạy pipeline."
+
+---
+
+### Bước 6: Tự phục hồi — Eigenvalue Clamping — *"Hệ thống tự sửa lỗi toán học"*
+
+**Thời lượng:** 2–3 phút
+
+**Thao tác:**
+
+```bash
+# Xem log pipeline gần nhất — tìm dòng WARNING về eigenvalue
+# (nếu mẫu nhỏ, WARNING này sẽ xuất hiện)
+grep -i "eigenvalue" reports/logs/pipeline_*.log
+```
+
+Nếu có dòng WARNING, chỉ vào và giải thích:
+
+**Lời thoại gợi ý:**
+
+> "Khi mẫu chỉ có 10 tuần, ma trận hiệp phương sai phần dư $\Sigma_u$
+> (4×4 ma trận, ước lượng từ 10 quan sát) có thể bị **suy biến** — một số
+> eigenvalue gần bằng 0 hoặc âm, khiến phân rã Cholesky thất bại.
+>
+> Hệ thống truyền thống sẽ **CRASH** tại bước này và yêu cầu can thiệp thủ công.
+>
+> Pipeline của chúng tôi tự phát hiện vấn đề và áp dụng **Eigenvalue Clamping**:
+> - Phân rã spectral: $\Sigma_u = V \Lambda V^T$
+> - Kẹp eigenvalue $\leq 0$ lên ngưỡng tối thiểu: $\max(|\lambda|) \times 10^{-8}$
+> - Tái tạo ma trận xác định dương: $\tilde{\Sigma}_u = V \tilde{\Lambda} V^T$
+>
+> Đây KHÔNG phải 'hack' — đây là kỹ thuật đại số tuyến tính chuẩn, tương tự
+> Ridge Regularization nhưng **chính xác hơn**: Ridge thêm nhiễu vào TẤT CẢ
+> chiều ($+\varepsilon I$), trong khi Eigenvalue Clamping chỉ sửa chiều bị lỗi,
+> giữ nguyên chiều khỏe mạnh.
+>
+> Kết quả: khoảng tin cậy vẫn trung thực — không bị phóng đại giả."
+
+---
+
 ## 4. Xử lý câu hỏi khó (Q&A Preparation)
 
 ### Câu hỏi 1: "Tại sao không dùng AI/Deep Learning (LSTM, Transformer) mà lại dùng VECM?"
@@ -338,6 +418,9 @@ open data/processed/figures/vecm_forecast.png
 | Bước 2: Làm sạch | 4–5 phút | 9 phút |
 | Bước 3: Kiểm định | 5–6 phút | 15 phút |
 | Bước 4: Dự báo | 5–6 phút | 21 phút |
-| Q&A | 5–10 phút | 30 phút |
+| Bước 5: Chịu lỗi & Resume | 3–4 phút | 25 phút |
+| Bước 6: Tự phục hồi (Eigenvalue) | 2–3 phút | 28 phút |
+| Q&A | 5–10 phút | 38 phút |
 
-> **Tổng thời lượng khuyến nghị:** 25–30 phút (bao gồm Q&A)
+> **Tổng thời lượng khuyến nghị:** 30–38 phút (bao gồm Q&A)
+> Nếu giới hạn thời gian 25 phút, có thể bỏ Bước 5–6 và chỉ nhắc trong Q&A.
