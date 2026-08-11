@@ -8,7 +8,9 @@ Mục đích:
     (2) Forecast Error Variance Decomposition (FEVD) — phân rã phương sai sai
         số dự báo của DelayRate theo đóng góp từ từng biến qua 12 tuần.
 
-  Cả hai đều dựa trên mô hình VECM đã fit ở Tầng 4 (tang4_vecm_forecasting.py).
+  Hỗ trợ cả hai route từ Phase 3:
+    - route = "VECM": fit VECM → IRF/FEVD (có error correction term)
+    - route = "VAR_on_levels": fit VAR trên levels → IRF/FEVD (không đồng tích hợp)
 
 Cơ sở toán học:
   ═══════════════
@@ -88,6 +90,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator, PercentFormatter
 from scipy import linalg as la
 from statsmodels.tsa.vector_ar.vecm import VECM
+from statsmodels.tsa.api import VAR as VARModel
 from statsmodels.tsa.vector_ar.irf import IRAnalysis
 
 # ── Import tiện ích dùng chung (CLAUDE.md mục 7.1) ──
@@ -206,7 +209,29 @@ def _build_cholesky_P(sigma_u, orig_vars, chol_order, logger):
         Q[new_pos, orig_pos] = 1.0
 
     sigma_r = Q @ sigma_u @ Q.T
-    L = la.cholesky(sigma_r, lower=True)
+
+    # Cholesky cần ma trận dương xác định (PD). Với mẫu nhỏ (DoF ≈ 0),
+    # sigma_u có thể suy biến hoàn toàn (eigenvalue ≤ 0) — ridge đơn giản
+    # không đủ. Giải pháp: phân tích eigenvalue, kẹp (clamp) mọi eigenvalue
+    # ≤ 0 lên ngưỡng dương nhỏ, tái tạo ma trận PD rồi Cholesky.
+    try:
+        L = la.cholesky(sigma_r, lower=True)
+    except np.linalg.LinAlgError:
+        eigvals, eigvecs = np.linalg.eigh(sigma_r)
+        # Ngưỡng clamp: max(eigenvalue) × 1e-8, tối thiểu 1e-12
+        clamp_floor = max(np.max(np.abs(eigvals)) * 1e-8, 1e-12)
+        n_clamped = int(np.sum(eigvals < clamp_floor))
+        eigvals_fixed = np.maximum(eigvals, clamp_floor)
+        sigma_r = eigvecs @ np.diag(eigvals_fixed) @ eigvecs.T
+        # Đảm bảo đối xứng hoàn hảo sau tính toán số
+        sigma_r = (sigma_r + sigma_r.T) / 2.0
+        L = la.cholesky(sigma_r, lower=True)
+        logger.warning(
+            f"sigma_u suy biến — đã kẹp {n_clamped}/{n} eigenvalue "
+            f"lên ngưỡng {clamp_floor:.2e} để Cholesky phân rã thành công. "
+            f"Eigenvalues gốc: {np.array2string(eigvals, precision=4)}."
+        )
+
     P_full = Q.T @ L
 
     # Kiểm tra tính đúng đắn: P·P' phải xấp xỉ Σ_u
@@ -471,9 +496,10 @@ def run_phase5(input_csv=None, phase3_json=None):
     """
     Chạy Phase 5: fit lại VECM → trực giao hóa IRF → FEVD → vẽ biểu đồ.
 
-    Pipeline không lưu đối tượng vecm_result giữa các Phase (chỉ lưu JSON),
-    nên Phase 5 fit lại VECM với CÙNG tham số khóa cứng từ Phase 3 —
-    đảm bảo tái lập (reproducibility) và nhất quán với Tầng 4.
+    Pipeline không lưu đối tượng model giữa các Phase (chỉ lưu JSON),
+    nên Phase 5 fit lại mô hình (VECM hoặc VAR) với CÙNG tham số khóa
+    cứng từ Phase 3 — đảm bảo tái lập (reproducibility) và nhất quán
+    với Tầng 4.
 
     Tham số:
         input_csv:   đường dẫn CSV (mặc định data/processed/causal_weekly_dataset.csv)
@@ -507,22 +533,34 @@ def run_phase5(input_csv=None, phase3_json=None):
     with open(phase3_json, "r", encoding="utf-8") as f:
         phase3 = json.load(f)
 
-    COINT_RANK = phase3["coint_rank"]
     route = phase3["route"]
-    K_AR_DIFF = phase3.get("johansen_result", {}).get("k_ar_diff", 0)
 
-    if route != "VECM":
-        msg = f"Phase 3 chỉ định route '{route}' ≠ VECM. Phase 5 chỉ hỗ trợ VECM."
+    if route not in ("VECM", "VAR_on_levels", "VAR_on_differences"):
+        msg = (
+            f"Phase 3 chỉ định route '{route}' không được hỗ trợ. "
+            f"Phase 5 hỗ trợ: VECM, VAR_on_levels, VAR_on_differences."
+        )
         logger.error(msg)
         raise ValueError(msg)
 
     logger.info(f"Tham số KHÓA CỨNG từ Phase 3:")
-    logger.info(f"  coint_rank = {COINT_RANK}")
-    logger.info(f"  k_ar_diff  = {K_AR_DIFF}")
     logger.info(f"  route      = {route}")
 
+    is_var_route = route in ("VAR_on_levels", "VAR_on_differences")
+
+    if route == "VECM":
+        COINT_RANK = phase3["coint_rank"]
+        K_AR_DIFF = phase3.get("johansen_result", {}).get("k_ar_diff", 0)
+        logger.info(f"  coint_rank = {COINT_RANK}")
+        logger.info(f"  k_ar_diff  = {K_AR_DIFF}")
+    else:
+        LAG_ORDER = phase3.get("lag_selection", {}).get("selected_lag", 1)
+        logger.info(f"  lag_order  = {LAG_ORDER}")
+        if route == "VAR_on_differences":
+            logger.info("  fit_on     = sai phân bậc 1 (Δy)")
+
     # ══════════════════════════════════════════════════════════════════
-    # BƯỚC 2: Đọc dữ liệu và fit VECM (cùng tham số với Tầng 4)
+    # BƯỚC 2: Đọc dữ liệu và fit mô hình (VECM hoặc VAR, tùy route)
     # ══════════════════════════════════════════════════════════════════
     if input_csv is None:
         input_csv = os.path.join(
@@ -537,22 +575,45 @@ def run_phase5(input_csv=None, phase3_json=None):
     endog = df[ANALYSIS_VARIABLES].values.copy()
     n_vars = len(ANALYSIS_VARIABLES)
 
-    logger.info(
-        f"Fitting VECM(k_ar_diff={K_AR_DIFF}, coint_rank={COINT_RANK}, "
-        f"det='co') — tái lập từ Tầng 4..."
-    )
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        model = VECM(
-            endog,
-            k_ar_diff=K_AR_DIFF,
-            coint_rank=COINT_RANK,
-            deterministic="co",
+    if route == "VECM":
+        logger.info(
+            f"Fitting VECM(k_ar_diff={K_AR_DIFF}, coint_rank={COINT_RANK}, "
+            f"det='co') — tái lập từ Tầng 4..."
         )
-        vecm_res = model.fit()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            model = VECM(
+                endog,
+                k_ar_diff=K_AR_DIFF,
+                coint_rank=COINT_RANK,
+                deterministic="co",
+            )
+            model_result = model.fit()
+        is_vecm = True
+        logger.info("VECM fit thành công.")
 
-    logger.info("VECM fit thành công.")
+    else:  # VAR_on_levels hoặc VAR_on_differences
+        if route == "VAR_on_differences":
+            # Sai phân bậc 1: IRF/FEVD trên Δy cho biết phản ứng trong
+            # thay đổi (changes), không phải mức (levels) — đây là diễn giải
+            # chuẩn khi biến gốc là I(1).
+            endog_fit = np.diff(endog, axis=0)
+            fit_label = "Δy (sai phân bậc 1)"
+        else:
+            endog_fit = endog
+            fit_label = "levels"
+
+        logger.info(
+            f"Fitting VAR(p={LAG_ORDER}, trend='c') trên {fit_label} — "
+            f"tái lập từ Tầng 4..."
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            endog_df = pd.DataFrame(endog_fit, columns=ANALYSIS_VARIABLES)
+            var_model = VARModel(endog_df)
+            model_result = var_model.fit(maxlags=LAG_ORDER, ic=None, trend="c")
+        is_vecm = False
+        logger.info(f"VAR({model_result.k_ar}) fit thành công trên {fit_label}.")
 
     # ══════════════════════════════════════════════════════════════════
     # BƯỚC 3: Xây dựng Cholesky P với thứ tự tùy chỉnh
@@ -561,8 +622,9 @@ def run_phase5(input_csv=None, phase3_json=None):
     logger.info("CHOLESKY ORDERING — TRỰC GIAO HÓA")
     logger.info("─" * 60)
 
+    sigma_u = np.asarray(model_result.sigma_u)
     P_full, chol_idx = _build_cholesky_P(
-        vecm_res.sigma_u, ANALYSIS_VARIABLES, CHOLESKY_ORDER, logger
+        sigma_u, ANALYSIS_VARIABLES, CHOLESKY_ORDER, logger
     )
 
     # ══════════════════════════════════════════════════════════════════
@@ -573,10 +635,12 @@ def run_phase5(input_csv=None, phase3_json=None):
     logger.info("─" * 60)
 
     # Truyền P tùy chỉnh vào IRAnalysis để orth_irfs phản ánh Cholesky ordering
+    # vecm=True cho VECM (cần chuyển từ VECM → VAR representation trước IRF)
+    # vecm=False cho VAR (IRF tính trực tiếp từ VAR coefficients)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         irf_obj = IRAnalysis(
-            vecm_res, P=P_full, periods=IRF_PERIODS, vecm=True
+            model_result, P=P_full, periods=IRF_PERIODS, vecm=is_vecm
         )
 
     orth_irfs = irf_obj.orth_irfs   # shape: (periods+1, n_vars, n_vars)
@@ -692,11 +756,19 @@ def run_phase5(input_csv=None, phase3_json=None):
             "ci_method": "Asymptotic SE (Lütkepohl 2005, Prop. 3.6)",
             "variables": ANALYSIS_VARIABLES,
         },
-        "locked_parameters": {
-            "coint_rank": COINT_RANK,
-            "k_ar_diff": K_AR_DIFF,
-            "deterministic": "co",
-        },
+        "locked_parameters": (
+            {
+                "route": "VECM",
+                "coint_rank": COINT_RANK,
+                "k_ar_diff": K_AR_DIFF,
+                "deterministic": "co",
+            } if is_vecm else {
+                "route": route,
+                "lag_order": int(model_result.k_ar),
+                "trend": "c",
+                "fit_on": "differences" if route == "VAR_on_differences" else "levels",
+            }
+        ),
         "irf": irf_json_data,
         "fevd": fevd_all,
         "figures": {
@@ -726,7 +798,7 @@ def run_phase5(input_csv=None, phase3_json=None):
         "fevd_figure": fevd_path,
         "results_json": json_path,
         "fevd_data": fevd_all,
-        "vecm_result": vecm_res,
+        "model_result": model_result,
     }
 
 

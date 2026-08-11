@@ -1,19 +1,19 @@
 {
   "metadata": {
     "script": "phase3b_toda_yamamoto.py",
-    "timestamp": "2026-08-10T16:17:41.925367",
+    "timestamp": "2026-08-11T02:52:57.216263",
     "input_file": "data/processed/causal_weekly_dataset.csv",
     "phase1_file": "reports/phase1_stationarity.json",
     "phase2_file": "reports/phase2_granger_causality.json",
-    "n_observations": 375,
+    "n_observations": 6,
     "significance_level": 0.05,
     "d_values_from_phase1": {
-      "OEE_Score": 1,
+      "OEE_Score": 0,
       "DelayRate": 1,
-      "Revenue": 1,
-      "OrderVolume": 0
+      "Revenue": 2,
+      "OrderVolume": 1
     },
-    "d_max": 1,
+    "d_max": 2,
     "method": "Toda-Yamamoto (1995) augmented Wald test on VAR(k+d_max) in levels"
   },
   "lag_selection": {
@@ -21,283 +21,191 @@
     "error": "maxlags is too large for the number of observations and the number of equations. The largest model cannot be estimated."
   },
   "k": 1,
-  "d_max": 1,
-  "total_var_lags": 2,
+  "d_max": 2,
+  "total_var_lags": 3,
   "pairwise_results": [
     {
       "cause": "OEE_Score",
       "effect": "DelayRate",
       "skipped": false,
-      "wald_statistic": 32.19914650307201,
-      "p_value": 1.0186950030936064e-07,
-      "df": 2,
-      "significant": true,
+      "wald_statistic": 4.805862958062373e-17,
+      "p_value": 1.0,
+      "df": 3,
+      "significant": false,
       "k_lags_tested": 1,
-      "d_max_extra_lags": 1,
-      "total_var_lags": 2,
-      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=2), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
-      "conclusion": "OEE_Score → DelayRate: CÓ nhân quả Toda-Yamamoto (p=0.0000)"
+      "d_max_extra_lags": 2,
+      "total_var_lags": 3,
+      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=3), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
+      "conclusion": "OEE_Score → DelayRate: KHÔNG nhân quả Toda-Yamamoto (p=1.0000)"
     },
     {
       "cause": "OEE_Score",
       "effect": "Revenue",
       "skipped": false,
-      "wald_statistic": 11.328977747795788,
-      "p_value": 0.003466919352906159,
-      "df": 2,
-      "significant": true,
+      "wald_statistic": 4.659776825977049e-17,
+      "p_value": 1.0,
+      "df": 3,
+      "significant": false,
       "k_lags_tested": 1,
-      "d_max_extra_lags": 1,
-      "total_var_lags": 2,
-      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=2), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
-      "conclusion": "OEE_Score → Revenue: CÓ nhân quả Toda-Yamamoto (p=0.0035)"
+      "d_max_extra_lags": 2,
+      "total_var_lags": 3,
+      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=3), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
+      "conclusion": "OEE_Score → Revenue: KHÔNG nhân quả Toda-Yamamoto (p=1.0000)"
     },
     {
       "cause": "OEE_Score",
       "effect": "OrderVolume",
       "skipped": false,
-      "wald_statistic": 13.823169292999117,
-      "p_value": 0.0009961779551603141,
-      "df": 2,
-      "significant": true,
+      "wald_statistic": 1.888894781378411e-16,
+      "p_value": 1.0,
+      "df": 3,
+      "significant": false,
       "k_lags_tested": 1,
-      "d_max_extra_lags": 1,
-      "total_var_lags": 2,
-      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=2), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
-      "conclusion": "OEE_Score → OrderVolume: CÓ nhân quả Toda-Yamamoto (p=0.0010)"
+      "d_max_extra_lags": 2,
+      "total_var_lags": 3,
+      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=3), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
+      "conclusion": "OEE_Score → OrderVolume: KHÔNG nhân quả Toda-Yamamoto (p=1.0000)"
     },
     {
       "cause": "DelayRate",
       "effect": "OEE_Score",
       "skipped": false,
-      "wald_statistic": 9.449213823306687,
-      "p_value": 0.008874201569627056,
-      "df": 2,
-      "significant": true,
+      "wald_statistic": 6.553869829771904e-19,
+      "p_value": 1.0,
+      "df": 3,
+      "significant": false,
       "k_lags_tested": 1,
-      "d_max_extra_lags": 1,
-      "total_var_lags": 2,
-      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=2), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
-      "conclusion": "DelayRate → OEE_Score: CÓ nhân quả Toda-Yamamoto (p=0.0089)"
+      "d_max_extra_lags": 2,
+      "total_var_lags": 3,
+      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=3), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
+      "conclusion": "DelayRate → OEE_Score: KHÔNG nhân quả Toda-Yamamoto (p=1.0000)"
     },
     {
       "cause": "DelayRate",
       "effect": "Revenue",
       "skipped": false,
-      "wald_statistic": 10.288666198712727,
-      "p_value": 0.005832362673726339,
-      "df": 2,
-      "significant": true,
+      "wald_statistic": -2.474217214102175e-18,
+      "p_value": 1.0,
+      "df": 3,
+      "significant": false,
       "k_lags_tested": 1,
-      "d_max_extra_lags": 1,
-      "total_var_lags": 2,
-      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=2), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
-      "conclusion": "DelayRate → Revenue: CÓ nhân quả Toda-Yamamoto (p=0.0058)"
+      "d_max_extra_lags": 2,
+      "total_var_lags": 3,
+      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=3), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
+      "conclusion": "DelayRate → Revenue: KHÔNG nhân quả Toda-Yamamoto (p=1.0000)"
     },
     {
       "cause": "DelayRate",
       "effect": "OrderVolume",
       "skipped": false,
-      "wald_statistic": 0.7669219179643703,
-      "p_value": 0.6814986839316537,
-      "df": 2,
+      "wald_statistic": -8.744483556877074e-16,
+      "p_value": 1.0,
+      "df": 3,
       "significant": false,
       "k_lags_tested": 1,
-      "d_max_extra_lags": 1,
-      "total_var_lags": 2,
-      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=2), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
-      "conclusion": "DelayRate → OrderVolume: KHÔNG nhân quả Toda-Yamamoto (p=0.6815)"
+      "d_max_extra_lags": 2,
+      "total_var_lags": 3,
+      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=3), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
+      "conclusion": "DelayRate → OrderVolume: KHÔNG nhân quả Toda-Yamamoto (p=1.0000)"
     },
     {
       "cause": "Revenue",
       "effect": "OEE_Score",
       "skipped": false,
-      "wald_statistic": 1.254137699167668,
-      "p_value": 0.5341551978423622,
-      "df": 2,
+      "wald_statistic": -2.5728529802202116e+16,
+      "p_value": 1.0,
+      "df": 3,
       "significant": false,
       "k_lags_tested": 1,
-      "d_max_extra_lags": 1,
-      "total_var_lags": 2,
-      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=2), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
-      "conclusion": "Revenue → OEE_Score: KHÔNG nhân quả Toda-Yamamoto (p=0.5342)"
+      "d_max_extra_lags": 2,
+      "total_var_lags": 3,
+      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=3), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
+      "conclusion": "Revenue → OEE_Score: KHÔNG nhân quả Toda-Yamamoto (p=1.0000)"
     },
     {
       "cause": "Revenue",
       "effect": "DelayRate",
       "skipped": false,
-      "wald_statistic": 14.123394805169264,
-      "p_value": 0.0008573216382635356,
-      "df": 2,
+      "wald_statistic": 6.008303057906922e+16,
+      "p_value": 0.0,
+      "df": 3,
       "significant": true,
       "k_lags_tested": 1,
-      "d_max_extra_lags": 1,
-      "total_var_lags": 2,
-      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=2), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
-      "conclusion": "Revenue → DelayRate: CÓ nhân quả Toda-Yamamoto (p=0.0009)"
+      "d_max_extra_lags": 2,
+      "total_var_lags": 3,
+      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=3), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
+      "conclusion": "Revenue → DelayRate: CÓ nhân quả Toda-Yamamoto (p=0.0000)"
     },
     {
       "cause": "Revenue",
       "effect": "OrderVolume",
       "skipped": false,
-      "wald_statistic": 4.231003444837736,
-      "p_value": 0.12057278030801938,
-      "df": 2,
+      "wald_statistic": -4773562003699718.0,
+      "p_value": 1.0,
+      "df": 3,
       "significant": false,
       "k_lags_tested": 1,
-      "d_max_extra_lags": 1,
-      "total_var_lags": 2,
-      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=2), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
-      "conclusion": "Revenue → OrderVolume: KHÔNG nhân quả Toda-Yamamoto (p=0.1206)"
+      "d_max_extra_lags": 2,
+      "total_var_lags": 3,
+      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=3), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
+      "conclusion": "Revenue → OrderVolume: KHÔNG nhân quả Toda-Yamamoto (p=1.0000)"
     },
     {
       "cause": "OrderVolume",
       "effect": "OEE_Score",
       "skipped": false,
-      "wald_statistic": 9.827732787613298,
-      "p_value": 0.00734403842286051,
-      "df": 2,
-      "significant": true,
+      "wald_statistic": 2.1516917381426178e-14,
+      "p_value": 1.0,
+      "df": 3,
+      "significant": false,
       "k_lags_tested": 1,
-      "d_max_extra_lags": 1,
-      "total_var_lags": 2,
-      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=2), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
-      "conclusion": "OrderVolume → OEE_Score: CÓ nhân quả Toda-Yamamoto (p=0.0073)"
+      "d_max_extra_lags": 2,
+      "total_var_lags": 3,
+      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=3), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
+      "conclusion": "OrderVolume → OEE_Score: KHÔNG nhân quả Toda-Yamamoto (p=1.0000)"
     },
     {
       "cause": "OrderVolume",
       "effect": "DelayRate",
       "skipped": false,
-      "wald_statistic": 7.038830446976049,
-      "p_value": 0.02961674928429682,
-      "df": 2,
-      "significant": true,
+      "wald_statistic": 6.896667190135044e-13,
+      "p_value": 1.0,
+      "df": 3,
+      "significant": false,
       "k_lags_tested": 1,
-      "d_max_extra_lags": 1,
-      "total_var_lags": 2,
-      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=2), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
-      "conclusion": "OrderVolume → DelayRate: CÓ nhân quả Toda-Yamamoto (p=0.0296)"
+      "d_max_extra_lags": 2,
+      "total_var_lags": 3,
+      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=3), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
+      "conclusion": "OrderVolume → DelayRate: KHÔNG nhân quả Toda-Yamamoto (p=1.0000)"
     },
     {
       "cause": "OrderVolume",
       "effect": "Revenue",
       "skipped": false,
-      "wald_statistic": 5.064571399476243,
-      "p_value": 0.07947715161186177,
-      "df": 2,
+      "wald_statistic": 2.9821147278465365e-13,
+      "p_value": 1.0,
+      "df": 3,
       "significant": false,
       "k_lags_tested": 1,
-      "d_max_extra_lags": 1,
-      "total_var_lags": 2,
-      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=2), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
-      "conclusion": "OrderVolume → Revenue: KHÔNG nhân quả Toda-Yamamoto (p=0.0795)"
+      "d_max_extra_lags": 2,
+      "total_var_lags": 3,
+      "note": "statsmodels test_causality kiểm định tất cả lag (k+d_max=3), không chỉ k=1 lag đầu như Toda-Yamamoto chuẩn. Với d_max nhỏ, sai biệt thường không đáng kể.",
+      "conclusion": "OrderVolume → Revenue: KHÔNG nhân quả Toda-Yamamoto (p=1.0000)"
     }
   ],
   "summary": {
     "total_pairs_tested": 12,
-    "significant_pairs": 8,
+    "significant_pairs": 1,
     "significant_list": [
-      "OEE_Score → DelayRate",
-      "OEE_Score → Revenue",
-      "OEE_Score → OrderVolume",
-      "DelayRate → OEE_Score",
-      "DelayRate → Revenue",
-      "Revenue → DelayRate",
-      "OrderVolume → OEE_Score",
-      "OrderVolume → DelayRate"
+      "Revenue → DelayRate"
     ]
   },
   "cross_check_with_granger": {
-    "total_compared": 12,
-    "agreements": 6,
-    "disagreements": 6,
-    "agreement_rate": 0.5,
-    "comparisons": [
-      {
-        "pair": "OEE_Score → DelayRate",
-        "granger_significant": false,
-        "toda_yamamoto_significant": true,
-        "agreement": false,
-        "status": "MÂU THUẪN"
-      },
-      {
-        "pair": "OEE_Score → Revenue",
-        "granger_significant": false,
-        "toda_yamamoto_significant": true,
-        "agreement": false,
-        "status": "MÂU THUẪN"
-      },
-      {
-        "pair": "OEE_Score → OrderVolume",
-        "granger_significant": false,
-        "toda_yamamoto_significant": true,
-        "agreement": false,
-        "status": "MÂU THUẪN"
-      },
-      {
-        "pair": "DelayRate → OEE_Score",
-        "granger_significant": true,
-        "toda_yamamoto_significant": true,
-        "agreement": true,
-        "status": "ĐỒNG THUẬN"
-      },
-      {
-        "pair": "DelayRate → Revenue",
-        "granger_significant": false,
-        "toda_yamamoto_significant": true,
-        "agreement": false,
-        "status": "MÂU THUẪN"
-      },
-      {
-        "pair": "DelayRate → OrderVolume",
-        "granger_significant": false,
-        "toda_yamamoto_significant": false,
-        "agreement": true,
-        "status": "ĐỒNG THUẬN"
-      },
-      {
-        "pair": "Revenue → OEE_Score",
-        "granger_significant": false,
-        "toda_yamamoto_significant": false,
-        "agreement": true,
-        "status": "ĐỒNG THUẬN"
-      },
-      {
-        "pair": "Revenue → DelayRate",
-        "granger_significant": false,
-        "toda_yamamoto_significant": true,
-        "agreement": false,
-        "status": "MÂU THUẪN"
-      },
-      {
-        "pair": "Revenue → OrderVolume",
-        "granger_significant": false,
-        "toda_yamamoto_significant": false,
-        "agreement": true,
-        "status": "ĐỒNG THUẬN"
-      },
-      {
-        "pair": "OrderVolume → OEE_Score",
-        "granger_significant": true,
-        "toda_yamamoto_significant": true,
-        "agreement": true,
-        "status": "ĐỒNG THUẬN"
-      },
-      {
-        "pair": "OrderVolume → DelayRate",
-        "granger_significant": false,
-        "toda_yamamoto_significant": true,
-        "agreement": false,
-        "status": "MÂU THUẪN"
-      },
-      {
-        "pair": "OrderVolume → Revenue",
-        "granger_significant": false,
-        "toda_yamamoto_significant": false,
-        "agreement": true,
-        "status": "ĐỒNG THUẬN"
-      }
-    ]
+    "total_compared": 0,
+    "agreements": 0,
+    "disagreements": 0,
+    "agreement_rate": 0,
+    "comparisons": []
   },
   "sensitivity_analysis": {
     "description": "Không có tuần nội suy — kết quả giống hoàn toàn.",

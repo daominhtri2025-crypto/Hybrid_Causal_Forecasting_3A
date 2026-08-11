@@ -1,12 +1,12 @@
 {
   "metadata": {
     "script": "phase1_stationarity.py",
-    "timestamp": "2026-08-10T16:17:12.546086",
+    "timestamp": "2026-08-11T02:52:56.122928",
     "input_file": "data/processed/causal_weekly_dataset.csv",
-    "n_observations": 375,
+    "n_observations": 6,
     "date_range": {
-      "start": "2018-01-29",
-      "end": "2026-01-05"
+      "start": "2026-06-01",
+      "end": "2026-08-17"
     },
     "significance_level": 0.05,
     "method": "ADF+KPSS dual confirmation (Pfaff, 2008)",
@@ -16,58 +16,27 @@
   },
   "results": {
     "OEE_Score": {
-      "integration_order": 1,
+      "integration_order": 0,
       "tests": {
         "level": {
           "adf": {
-            "statistic": -0.7426952018968724,
-            "p_value": 0.8353784838099874,
-            "lags_used": 11,
-            "n_obs_effective": 363,
+            "statistic": -55.988373632434715,
+            "p_value": 0.0,
+            "lags_used": 1,
+            "n_obs_effective": 4,
             "critical_values": {
-              "1%": -3.448493650810824,
-              "5%": -2.8695352280356556,
-              "10%": -2.5710293341377715
+              "1%": -7.355440625,
+              "5%": -4.474365000000001,
+              "10%": -3.1269325
             },
-            "ic_best": -2724.206237787872,
-            "reject_h0": false,
-            "interpretation": "không dừng (non-stationary)"
-          },
-          "kpss": {
-            "statistic": 0.35037359416257974,
-            "p_value": 0.09854586458509494,
-            "lags_used": 125,
-            "critical_values": {
-              "10%": 0.347,
-              "5%": 0.463,
-              "2.5%": 0.574,
-              "1%": 0.739
-            },
-            "reject_h0": false,
-            "interpretation": "dừng (stationary)"
-          },
-          "conclusion": "inconclusive",
-          "n_observations": 375
-        },
-        "first_diff": {
-          "adf": {
-            "statistic": -4.172336609718282,
-            "p_value": 0.0007336615145787093,
-            "lags_used": 10,
-            "n_obs_effective": 363,
-            "critical_values": {
-              "1%": -3.448493650810824,
-              "5%": -2.8695352280356556,
-              "10%": -2.5710293341377715
-            },
-            "ic_best": -2720.3183039649666,
+            "ic_best": -51.51957811163712,
             "reject_h0": true,
             "interpretation": "dừng (stationary)"
           },
           "kpss": {
-            "statistic": 0.21161343837998003,
+            "statistic": 0.2639442359850228,
             "p_value": 0.1,
-            "lags_used": 124,
+            "lags_used": 2,
             "critical_values": {
               "10%": 0.347,
               "5%": 0.463,
@@ -78,7 +47,7 @@
             "interpretation": "dừng (stationary)"
           },
           "conclusion": "stationary",
-          "n_observations": 374
+          "n_observations": 6
         }
       },
       "determination_method": "ADF+KPSS dual confirmation (Pfaff, 2008)"
@@ -88,23 +57,23 @@
       "tests": {
         "level": {
           "adf": {
-            "statistic": -2.292812778282163,
-            "p_value": 0.17429647252579344,
-            "lags_used": 9,
-            "n_obs_effective": 365,
+            "statistic": -2.7525941848490465,
+            "p_value": 0.06537089757040315,
+            "lags_used": 0,
+            "n_obs_effective": 5,
             "critical_values": {
-              "1%": -3.4483935212959844,
-              "5%": -2.8694912343676497,
-              "10%": -2.571005879151811
+              "1%": -6.045114,
+              "5%": -3.9292800000000003,
+              "10%": -2.98681
             },
-            "ic_best": -225.2659640925075,
+            "ic_best": -2.0332673059469215,
             "reject_h0": false,
             "interpretation": "không dừng (non-stationary)"
           },
           "kpss": {
-            "statistic": 0.3645826047999092,
-            "p_value": 0.09242129103452189,
-            "lags_used": 125,
+            "statistic": 0.3864985163204736,
+            "p_value": 0.08297477744807172,
+            "lags_used": 2,
             "critical_values": {
               "10%": 0.347,
               "5%": 0.463,
@@ -115,27 +84,27 @@
             "interpretation": "dừng (stationary)"
           },
           "conclusion": "inconclusive",
-          "n_observations": 375
+          "n_observations": 6
         },
         "first_diff": {
           "adf": {
-            "statistic": -11.501767443553279,
-            "p_value": 4.473800030594049e-21,
-            "lags_used": 8,
-            "n_obs_effective": 365,
+            "statistic": -3.8985246452200086,
+            "p_value": 0.0020457317740625878,
+            "lags_used": 0,
+            "n_obs_effective": 4,
             "critical_values": {
-              "1%": -3.4483935212959844,
-              "5%": -2.8694912343676497,
-              "10%": -2.571005879151811
+              "1%": -7.355440625,
+              "5%": -4.474365000000001,
+              "10%": -3.1269325
             },
-            "ic_best": -220.2263661612459,
+            "ic_best": -1.581855341531167,
             "reject_h0": true,
             "interpretation": "dừng (stationary)"
           },
           "kpss": {
-            "statistic": 0.19956190691023168,
+            "statistic": 0.1717647058823529,
             "p_value": 0.1,
-            "lags_used": 124,
+            "lags_used": 1,
             "critical_values": {
               "10%": 0.347,
               "5%": 0.463,
@@ -146,33 +115,33 @@
             "interpretation": "dừng (stationary)"
           },
           "conclusion": "stationary",
-          "n_observations": 374
+          "n_observations": 5
         }
       },
       "determination_method": "ADF+KPSS dual confirmation (Pfaff, 2008)"
     },
     "Revenue": {
-      "integration_order": 1,
+      "integration_order": 2,
       "tests": {
         "level": {
           "adf": {
-            "statistic": 0.734958586496168,
-            "p_value": 0.9905103196513002,
-            "lags_used": 13,
-            "n_obs_effective": 361,
+            "statistic": -0.6339082634365287,
+            "p_value": 0.863134622150119,
+            "lags_used": 0,
+            "n_obs_effective": 5,
             "critical_values": {
-              "1%": -3.4485948978753314,
-              "5%": -2.86957971128312,
-              "10%": -2.571053050314224
+              "1%": -6.045114,
+              "5%": -3.9292800000000003,
+              "10%": -2.98681
             },
-            "ic_best": 12041.898854911133,
+            "ic_best": 141.84763216334278,
             "reject_h0": false,
             "interpretation": "không dừng (non-stationary)"
           },
           "kpss": {
-            "statistic": 0.2470101335934616,
+            "statistic": 0.3236102552023777,
             "p_value": 0.1,
-            "lags_used": 125,
+            "lags_used": 2,
             "critical_values": {
               "10%": 0.347,
               "5%": 0.463,
@@ -183,27 +152,27 @@
             "interpretation": "dừng (stationary)"
           },
           "conclusion": "inconclusive",
-          "n_observations": 375
+          "n_observations": 6
         },
         "first_diff": {
           "adf": {
-            "statistic": -3.9288238266049467,
-            "p_value": 0.001832667954828038,
-            "lags_used": 12,
-            "n_obs_effective": 361,
+            "statistic": -1.7135843438873104,
+            "p_value": 0.4241273548535607,
+            "lags_used": 0,
+            "n_obs_effective": 4,
             "critical_values": {
-              "1%": -3.4485948978753314,
-              "5%": -2.86957971128312,
-              "10%": -2.571053050314224
+              "1%": -7.355440625,
+              "5%": -4.474365000000001,
+              "10%": -3.1269325
             },
-            "ic_best": 12007.626538001254,
-            "reject_h0": true,
-            "interpretation": "dừng (stationary)"
+            "ic_best": 144.223818959037,
+            "reject_h0": false,
+            "interpretation": "không dừng (non-stationary)"
           },
           "kpss": {
-            "statistic": 0.4073330207718264,
-            "p_value": 0.07399438759835068,
-            "lags_used": 124,
+            "statistic": 0.13532387882471997,
+            "p_value": 0.1,
+            "lags_used": 1,
             "critical_values": {
               "10%": 0.347,
               "5%": 0.463,
@@ -213,34 +182,96 @@
             "reject_h0": false,
             "interpretation": "dừng (stationary)"
           },
-          "conclusion": "stationary",
-          "n_observations": 374
+          "conclusion": "inconclusive",
+          "n_observations": 5
+        },
+        "second_diff": {
+          "adf": {
+            "statistic": -1.3395282980580336,
+            "p_value": 0.6108997474582771,
+            "lags_used": 0,
+            "n_obs_effective": 3,
+            "critical_values": {
+              "1%": -10.41719074074074,
+              "5%": -5.77838074074074,
+              "10%": -3.391681111111111
+            },
+            "ic_best": 112.13804179979607,
+            "reject_h0": false,
+            "interpretation": "không dừng (non-stationary)"
+          },
+          "kpss": {
+            "statistic": 0.2535289774820255,
+            "p_value": 0.1,
+            "lags_used": 1,
+            "critical_values": {
+              "10%": 0.347,
+              "5%": 0.463,
+              "2.5%": 0.574,
+              "1%": 0.739
+            },
+            "reject_h0": false,
+            "interpretation": "dừng (stationary)"
+          },
+          "conclusion": "inconclusive",
+          "n_observations": 4
         }
       },
       "determination_method": "ADF+KPSS dual confirmation (Pfaff, 2008)"
     },
     "OrderVolume": {
-      "integration_order": 0,
+      "integration_order": 1,
       "tests": {
         "level": {
           "adf": {
-            "statistic": -3.402884542736212,
-            "p_value": 0.01086092991308655,
-            "lags_used": 7,
-            "n_obs_effective": 367,
+            "statistic": -2.8419928002940256,
+            "p_value": 0.05252123214819676,
+            "lags_used": 0,
+            "n_obs_effective": 5,
             "critical_values": {
-              "1%": -3.448294490928673,
-              "5%": -2.869447722240253,
-              "10%": -2.570982681065269
+              "1%": -6.045114,
+              "5%": -3.9292800000000003,
+              "10%": -2.98681
             },
-            "ic_best": 1925.7621549943121,
+            "ic_best": 15.022555872689495,
+            "reject_h0": false,
+            "interpretation": "không dừng (non-stationary)"
+          },
+          "kpss": {
+            "statistic": 0.23947368421052664,
+            "p_value": 0.1,
+            "lags_used": 2,
+            "critical_values": {
+              "10%": 0.347,
+              "5%": 0.463,
+              "2.5%": 0.574,
+              "1%": 0.739
+            },
+            "reject_h0": false,
+            "interpretation": "dừng (stationary)"
+          },
+          "conclusion": "inconclusive",
+          "n_observations": 6
+        },
+        "first_diff": {
+          "adf": {
+            "statistic": -3.03315017762062,
+            "p_value": 0.0319124351571669,
+            "lags_used": 0,
+            "n_obs_effective": 4,
+            "critical_values": {
+              "1%": -7.355440625,
+              "5%": -4.474365000000001,
+              "10%": -3.1269325
+            },
+            "ic_best": 18.229830016149783,
             "reject_h0": true,
             "interpretation": "dừng (stationary)"
           },
           "kpss": {
-            "statistic": 0.3163306177741358,
+            "statistic": 0.2,
             "p_value": 0.1,
-            "lags_used": 125,
+            "lags_used": 1,
             "critical_values": {
               "10%": 0.347,
               "5%": 0.463,
@@ -251,62 +282,46 @@
             "interpretation": "dừng (stationary)"
           },
           "conclusion": "stationary",
-          "n_observations": 375
+          "n_observations": 5
         }
       },
       "determination_method": "ADF+KPSS dual confirmation (Pfaff, 2008)"
     }
   },
-  "d_max": 1,
+  "d_max": 2,
   "d_values": {
-    "OEE_Score": 1,
+    "OEE_Score": 0,
     "DelayRate": 1,
-    "Revenue": 1,
-    "OrderVolume": 0
+    "Revenue": 2,
+    "OrderVolume": 1
   },
   "time_gaps": [
     {
-      "after": "2018-01-29",
-      "before": "2018-03-12",
-      "actual_gap_weeks": 6,
-      "missing_weeks": 5
+      "after": "2026-06-01",
+      "before": "2026-06-15",
+      "actual_gap_weeks": 2,
+      "missing_weeks": 1
     },
     {
-      "after": "2018-03-12",
-      "before": "2018-04-23",
-      "actual_gap_weeks": 6,
-      "missing_weeks": 5
+      "after": "2026-06-15",
+      "before": "2026-07-13",
+      "actual_gap_weeks": 4,
+      "missing_weeks": 3
     },
     {
-      "after": "2018-04-23",
-      "before": "2018-05-28",
-      "actual_gap_weeks": 5,
-      "missing_weeks": 4
-    },
-    {
-      "after": "2018-05-28",
-      "before": "2018-08-13",
-      "actual_gap_weeks": 11,
-      "missing_weeks": 10
-    },
-    {
-      "after": "2018-08-20",
-      "before": "2018-09-24",
-      "actual_gap_weeks": 5,
-      "missing_weeks": 4
-    },
-    {
-      "after": "2018-10-01",
-      "before": "2018-12-31",
-      "actual_gap_weeks": 13,
-      "missing_weeks": 12
+      "after": "2026-07-13",
+      "before": "2026-08-03",
+      "actual_gap_weeks": 3,
+      "missing_weeks": 2
     }
   ],
   "sensitivity_analysis": {
     "description": "Không có tuần nội suy — kết quả giống hoàn toàn.",
     "excluded_weeks": [],
-    "n_observations_clean": 375,
+    "n_observations_clean": 6,
     "discrepancies": []
   },
-  "warnings": []
+  "warnings": [
+    "Kích thước mẫu (6) nhỏ hơn khuyến nghị (30) cho kiểm định ADF/KPSS. Kết quả cần được diễn giải thận trọng."
+  ]
 }

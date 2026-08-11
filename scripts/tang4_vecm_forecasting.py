@@ -1,10 +1,12 @@
 """
-Tầng 4 — Dự báo bằng VECM (Vector Error Correction Model)
+Tầng 4 — Dự báo bằng VECM hoặc VAR trên mức gốc (tùy route từ Phase 3)
 
 Mục đích:
-  Xây dựng mô hình VECM với các tham số đã KHÓA CỨNG từ Tầng 3 (Phase 3):
-    - Cointegrating rank r = 2 (từ Johansen Trace test — Phase 3)
-    - k_ar_diff = 1 (chỉ định tường minh từ người dùng)
+  Xây dựng mô hình dự báo với tham số KHÓA CỨNG từ Tầng 3 (Phase 3).
+  Tùy theo kết quả Johansen cointegration test:
+    - route = "VECM": dùng VECM (coint_rank < n_vars → có đồng tích hợp)
+    - route = "VAR_on_levels": dùng VAR trên levels (rank = n → full rank,
+      không có đồng tích hợp)
   Dự báo h = 4 chu kỳ (tuần) tiếp theo, kèm khoảng tin cậy 95%.
 
 Cơ sở toán học — VECM (Vector Error Correction Model):
@@ -82,6 +84,7 @@ from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
 from statsmodels.tsa.vector_ar.vecm import VECM
+from statsmodels.tsa.api import VAR as VARModel
 
 # ── Import tiện ích dùng chung (CLAUDE.md mục 7.1) ──
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -198,6 +201,309 @@ def _compute_forecast_ci(vecm_result, forecast, n_vars, h, logger):
 
 
 # ══════════════════════════════════════════════════════════════════════
+# NHÁNH VAR TRÊN MỨC GỐC — Khi Johansen rank = n (full rank)
+# ══════════════════════════════════════════════════════════════════════
+
+def _run_var_on_levels(endog, df, n_obs, n_vars, lag_order,
+                       route, input_csv, phase3_json,
+                       base_dir, start_time, logger):
+    """
+    Nhánh VAR — dùng khi Johansen test chỉ định KHÔNG dùng VECM.
+
+    Hai trường hợp:
+      (1) VAR_on_levels (rank r = n, full rank): tất cả biến dừng ở mức →
+          fit VAR trên levels trực tiếp. Forecast đã ở levels.
+      (2) VAR_on_differences (rank r = 0): không đồng tích hợp → fit VAR
+          trên sai phân bậc 1 (Δy). Forecast Δy được tích lũy (cumulate)
+          lại levels bằng cách cộng vào giá trị cuối cùng đã quan sát.
+
+    Tham khảo: Lütkepohl (2005), Chương 3 — VAR(p).
+    """
+    use_differences = (route == "VAR_on_differences")
+
+    logger.info("─" * 60)
+    if use_differences:
+        logger.info("NHÁNH VAR TRÊN SAI PHÂN (DIFFERENCES)")
+        logger.info("─" * 60)
+        logger.info(f"  Lý do: Johansen rank = 0 → không có đồng tích hợp")
+        logger.info(f"  → Dùng VAR(p={lag_order}) trên Δy (sai phân bậc 1)")
+    else:
+        logger.info("NHÁNH VAR TRÊN MỨC GỐC (LEVELS)")
+        logger.info("─" * 60)
+        logger.info(f"  Lý do: Johansen rank = n (full rank) → không có đồng tích hợp")
+        logger.info(f"  → Dùng VAR(p={lag_order}) trên levels")
+
+    # ── Tính bậc tự do ──
+    params_per_eq = n_vars * lag_order + 1  # A_1..A_p + intercept
+    effective_obs = n_obs - lag_order
+    dof = effective_obs - params_per_eq
+
+    logger.info(f"  Ước tính: {params_per_eq} params/equation, "
+                f"~{effective_obs} effective obs, ~{dof} DoF")
+
+    if dof < 5:
+        logger.warning(
+            f"BẬC TỰ DO ƯỚC TÍNH THẤP ({dof}). "
+            f"Ước lượng VAR có thể không ổn định với mẫu nhỏ (N={n_obs})."
+        )
+
+    # ── Chuẩn bị dữ liệu đầu vào: levels hoặc sai phân ──
+    if use_differences:
+        # Sai phân bậc 1: Δy_t = y_t - y_{t-1}
+        endog_fit = np.diff(endog, axis=0)  # shape (n_obs-1, n_vars)
+        last_level = endog[-1, :].copy()    # y_T — dùng để cumulate forecast
+        logger.info(f"  Đã sai phân: {endog_fit.shape[0]} quan sát Δy "
+                     f"(từ {n_obs} levels)")
+    else:
+        endog_fit = endog
+
+    # ── Fit VAR(p) ──
+    endog_df = pd.DataFrame(endog_fit, columns=ANALYSIS_VARIABLES)
+    model = VARModel(endog_df)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        var_result = model.fit(maxlags=lag_order, ic=None, trend="c")
+
+    data_label = "Δy (sai phân)" if use_differences else "levels"
+    logger.info(f"VAR({var_result.k_ar}) fit thành công trên {data_label}.")
+    logger.info(f"  AIC = {var_result.aic:.4f}, BIC = {var_result.bic:.4f}")
+    logger.info(f"  Log-likelihood = {var_result.llf:.4f}")
+
+    # ── Log hệ số VAR (coefficient matrices) ──
+    logger.info("─" * 60)
+    logger.info("HỆ SỐ VAR (COEFFICIENT MATRICES)")
+    logger.info("─" * 60)
+
+    coef_matrices = {}
+    for lag in range(var_result.k_ar):
+        A_lag = np.asarray(var_result.coefs[lag])  # shape (n_vars, n_vars)
+        coef_matrices[f"A_{lag + 1}"] = _matrix_to_list(A_lag)
+        logger.info(f"  A_{lag + 1} — tác động của y_{{t-{lag + 1}}} lên y_t:")
+        for v_idx, var_name in enumerate(ANALYSIS_VARIABLES):
+            row_str = "  ".join(f"{A_lag[v_idx, j]:+.6f}" for j in range(n_vars))
+            logger.info(f"    {var_name}: [{row_str}]")
+
+    # Intercept: coefs_exog shape = (n_vars, n_trend)
+    coefs_exog = np.asarray(var_result.coefs_exog)
+    intercept = coefs_exog[:, 0] if coefs_exog.shape[1] > 0 else np.zeros(n_vars)
+    coef_matrices["intercept"] = [_safe_float(v) for v in intercept]
+    logger.info(f"  Intercept: [{', '.join(f'{v:+.6f}' for v in intercept)}]")
+
+    # ── Dự báo + khoảng tin cậy 95% ──
+    logger.info("─" * 60)
+    logger.info(f"DỰ BÁO {FORECAST_HORIZON} BƯỚC (TUẦN)")
+    logger.info("─" * 60)
+
+    # forecast_interval trả về (point, lower, upper) — mỗi shape (h, n_vars)
+    # Chuyển endog_fit về numpy array (VAR có thể trả DataFrame nếu input là DataFrame)
+    endog_arr = np.asarray(endog_fit)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fc_point, fc_lower, fc_upper = var_result.forecast_interval(
+            endog_arr, steps=FORECAST_HORIZON, alpha=1 - CONFIDENCE_LEVEL
+        )
+
+    # Xử lý NaN trong CI — xảy ra khi DoF = 0 (mẫu quá nhỏ, variance singular)
+    has_nan_ci = np.any(np.isnan(fc_lower)) or np.any(np.isnan(fc_upper))
+    if has_nan_ci:
+        logger.warning(
+            "Khoảng tin cậy chứa NaN (DoF quá thấp để ước lượng variance). "
+            "Dùng xấp xỉ √h từ residual std làm fallback."
+        )
+        # Fallback: dùng residual std × √h
+        resid_std = np.std(np.asarray(var_result.resid), axis=0, ddof=0)
+        for h_idx in range(FORECAST_HORIZON):
+            se_h = resid_std * np.sqrt(h_idx + 1)
+            fc_lower[h_idx] = fc_point[h_idx] - Z_SCORE_95 * se_h
+            fc_upper[h_idx] = fc_point[h_idx] + Z_SCORE_95 * se_h
+
+    if use_differences:
+        # Forecast trên Δy → tích lũy (cumulate) về levels:
+        #   ŷ_{T+1} = y_T + Δŷ_{T+1}
+        #   ŷ_{T+2} = y_T + Δŷ_{T+1} + Δŷ_{T+2}
+        fc_point = last_level + np.cumsum(fc_point, axis=0)
+        fc_lower = last_level + np.cumsum(fc_lower, axis=0)
+        fc_upper = last_level + np.cumsum(fc_upper, axis=0)
+        logger.info("  Đã tích lũy (cumulate) dự báo Δy → levels.")
+
+    # Tính SE từ khoảng tin cậy
+    fc_se = (fc_upper - fc_point) / Z_SCORE_95
+    ci_method = (
+        f"VAR forecast_interval trên {'Δy (cumulated)' if use_differences else 'levels'} "
+        f"(Lütkepohl 2005)"
+        + (" [fallback √h]" if has_nan_ci else "")
+    )
+
+    logger.info(f"Dự báo thành công: shape={fc_point.shape}")
+
+    # ── Tạo dates + DataFrame kết quả ──
+    last_date = df["week_start"].max()
+    future_dates = [
+        last_date + timedelta(weeks=i + 1) for i in range(FORECAST_HORIZON)
+    ]
+
+    logger.info("─" * 60)
+    logger.info("KẾT QUẢ DỰ BÁO (Point Forecast ± 95% CI)")
+    logger.info("─" * 60)
+
+    forecast_records = []
+    for h_idx in range(FORECAST_HORIZON):
+        record = {"week_start": future_dates[h_idx].strftime("%Y-%m-%d")}
+        for v_idx, var in enumerate(ANALYSIS_VARIABLES):
+            fc = float(fc_point[h_idx, v_idx])
+            lo = float(fc_lower[h_idx, v_idx])
+            hi = float(fc_upper[h_idx, v_idx])
+            record[f"{var}_forecast"] = fc
+            record[f"{var}_lower_95"] = lo
+            record[f"{var}_upper_95"] = hi
+        forecast_records.append(record)
+
+        logger.info(f"  Tuần {future_dates[h_idx].date()} (T+{h_idx + 1}):")
+        for v_idx, var in enumerate(ANALYSIS_VARIABLES):
+            fc = float(fc_point[h_idx, v_idx])
+            lo = float(fc_lower[h_idx, v_idx])
+            hi = float(fc_upper[h_idx, v_idx])
+            logger.info(f"    {var:15s}: {fc:>12.4f}  [{lo:>12.4f}, {hi:>12.4f}]")
+
+    forecast_df = pd.DataFrame(forecast_records)
+
+    # ── Lưu CSV dự báo ──
+    forecast_dir = os.path.join(base_dir, "reports", "forecasts")
+    os.makedirs(forecast_dir, exist_ok=True)
+    forecast_csv_path = os.path.join(forecast_dir, "vecm_forecast.csv")
+    forecast_df.to_csv(forecast_csv_path, index=False)
+    logger.info(f"Đã lưu dự báo CSV: {forecast_csv_path}")
+
+    # ── Lưu JSON chi tiết ──
+    sigma_u = np.asarray(var_result.sigma_u)
+
+    output_json = {
+        "metadata": {
+            "script": "tang4_vecm_forecasting.py",
+            "model_type": route,
+            "timestamp": datetime.now().isoformat(),
+            "input_csv": os.path.relpath(input_csv, base_dir),
+            "phase3_json": os.path.relpath(phase3_json, base_dir),
+            "n_observations": n_obs,
+            "forecast_horizon": FORECAST_HORIZON,
+            "confidence_level": CONFIDENCE_LEVEL,
+            "ci_method": ci_method,
+            "variables": ANALYSIS_VARIABLES,
+        },
+        "locked_parameters": {
+            "route": route,
+            "lag_order": int(var_result.k_ar),
+            "trend": "c",
+            "fit_on": "differences (Δy)" if use_differences else "levels",
+            "route_explanation": (
+                (
+                    "Johansen rank = 0 → không đồng tích hợp → VAR trên sai "
+                    "phân bậc 1. Forecast Δy được tích lũy về levels."
+                ) if use_differences else (
+                    "Johansen rank = n (full rank) → không đồng tích hợp → "
+                    "VAR trên levels. Phổ biến khi dữ liệu hỗn hợp I(0)+I(1)."
+                )
+            ),
+        },
+        "var_coefficients": coef_matrices,
+        "model_diagnostics": {
+            "sigma_u": _matrix_to_list(sigma_u),
+            "sigma_u_description": (
+                "Ma trận hiệp phương sai innovation (n × n). "
+                "Đường chéo = variance sai số từng biến."
+            ),
+            "log_likelihood": _safe_float(float(var_result.llf)),
+            "aic": _safe_float(float(var_result.aic)),
+            "bic": _safe_float(float(var_result.bic)),
+            "effective_observations": int(var_result.nobs),
+            "degrees_of_freedom_per_equation": int(var_result.df_resid),
+            "total_parameters": int(n_vars * params_per_eq),
+        },
+        "forecast": {
+            "dates": [d.strftime("%Y-%m-%d") for d in future_dates],
+            "point_forecasts": {
+                var: [float(fc_point[h, v_idx])
+                      for h in range(FORECAST_HORIZON)]
+                for v_idx, var in enumerate(ANALYSIS_VARIABLES)
+            },
+            "lower_95": {
+                var: [float(fc_lower[h, v_idx])
+                      for h in range(FORECAST_HORIZON)]
+                for v_idx, var in enumerate(ANALYSIS_VARIABLES)
+            },
+            "upper_95": {
+                var: [float(fc_upper[h, v_idx])
+                      for h in range(FORECAST_HORIZON)]
+                for v_idx, var in enumerate(ANALYSIS_VARIABLES)
+            },
+            "standard_errors": {
+                var: [float(fc_se[h, v_idx])
+                      for h in range(FORECAST_HORIZON)]
+                for v_idx, var in enumerate(ANALYSIS_VARIABLES)
+            },
+        },
+        "warnings": [],
+    }
+
+    # ── Cảnh báo ──
+    if dof < 5:
+        output_json["warnings"].append(
+            f"Bậc tự do thấp ({dof}/equation). Ước lượng có thể không ổn định."
+        )
+    if n_obs < 30:
+        output_json["warnings"].append(
+            f"Mẫu nhỏ ({n_obs} tuần < 30 tối thiểu khuyến nghị). Khoảng "
+            f"tin cậy có thể đánh giá THẤP hơn độ bất định thực tế."
+        )
+
+    for v_idx, var in enumerate(ANALYSIS_VARIABLES):
+        for h_idx in range(FORECAST_HORIZON):
+            fc = float(fc_point[h_idx, v_idx])
+            if var in ("OEE_Score", "DelayRate") and (fc < 0 or fc > 1):
+                output_json["warnings"].append(
+                    f"{var} T+{h_idx + 1} = {fc:.4f}: ngoài [0, 1]. "
+                    f"VAR không ràng buộc biên — cần diễn giải cẩn thận."
+                )
+            if var in ("Revenue", "OrderVolume") and fc < 0:
+                output_json["warnings"].append(
+                    f"{var} T+{h_idx + 1} = {fc:.4f}: âm (vô nghĩa kinh tế). "
+                    f"Mô hình tuyến tính không ràng buộc phi âm."
+                )
+
+    if output_json["warnings"]:
+        logger.warning(f"Có {len(output_json['warnings'])} cảnh báo:")
+        for w in output_json["warnings"]:
+            logger.warning(f"  ⚠ {w}")
+
+    json_path = os.path.join(base_dir, "reports", "tang4_vecm_results.json")
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(output_json, f, ensure_ascii=False, indent=2)
+    logger.info(f"Đã lưu JSON chi tiết: {json_path}")
+
+    # ── Tổng kết ──
+    elapsed = (datetime.now() - start_time).total_seconds()
+    logger.info("=" * 70)
+    route_label = "VAR ON DIFFERENCES" if use_differences else "VAR ON LEVELS"
+    logger.info(f"TẦNG 4 — {route_label} FORECASTING HOÀN TẤT trong {elapsed:.1f}s")
+    fit_label = "Δy" if use_differences else "levels"
+    logger.info(f"  Mô hình: VAR(p={var_result.k_ar}, trend='c') trên {fit_label}")
+    logger.info(f"  Dự báo:  {FORECAST_HORIZON} tuần "
+                f"({future_dates[0].date()} → {future_dates[-1].date()})")
+    logger.info(f"  Output CSV:  {forecast_csv_path}")
+    logger.info(f"  Output JSON: {json_path}")
+    if output_json["warnings"]:
+        logger.info(f"  Cảnh báo: {len(output_json['warnings'])}")
+    logger.info("=" * 70)
+
+    return {
+        "forecast_csv": forecast_csv_path,
+        "results_json": json_path,
+        "forecast_df": forecast_df,
+        "model_result": var_result,
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════
 # HÀM CHÍNH
 # ══════════════════════════════════════════════════════════════════════
 
@@ -275,8 +581,11 @@ def run_tang4(input_csv=None, phase3_json=None):
                 f"det_order=1)")
     logger.info(f"  Route: {route} — {phase3.get('route_explanation', '')}")
 
-    if route != "VECM":
-        msg = f"Phase 3 chỉ định route '{route}' ≠ VECM. Tầng 4 chỉ hỗ trợ VECM."
+    if route not in ("VECM", "VAR_on_levels", "VAR_on_differences"):
+        msg = (
+            f"Phase 3 chỉ định route '{route}' không được hỗ trợ. "
+            f"Tầng 4 hỗ trợ: VECM, VAR_on_levels, VAR_on_differences."
+        )
         logger.error(msg)
         raise ValueError(msg)
 
@@ -309,7 +618,16 @@ def run_tang4(input_csv=None, phase3_json=None):
                      f"mean={col.mean():.4f}, std={col.std():.4f}")
 
     # ══════════════════════════════════════════════════════════════════
-    # BƯỚC 3: Fit VECM với tham số KHÓA CỨNG
+    # PHÂN NHÁNH: VAR routes → xử lý riêng và return sớm
+    # ══════════════════════════════════════════════════════════════════
+    if route in ("VAR_on_levels", "VAR_on_differences"):
+        return _run_var_on_levels(
+            endog, df, n_obs, n_vars, selected_lag_from_json,
+            route, input_csv, phase3_json, base_dir, start_time, logger
+        )
+
+    # ══════════════════════════════════════════════════════════════════
+    # BƯỚC 3: Fit VECM với tham số KHÓA CỨNG (chỉ khi route == "VECM")
     # ══════════════════════════════════════════════════════════════════
     # TẠI SAO dùng deterministic='co'?
     # → 'co' = constant outside cointegrating relation = unrestricted constant
