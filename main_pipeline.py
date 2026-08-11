@@ -18,14 +18,19 @@ Cách dùng:
     # Chỉ chạy đến Phase 3 (debug / kiểm tra trung gian)
     python main_pipeline.py --stop-after phase3
 
+    # Tiếp tục từ Phase 3 (bỏ qua Phase 0-2 nếu output đã có)
+    python main_pipeline.py --resume-from phase3
+
 Input:
-    --delay-csv : (tùy chọn) Đường dẫn CSV chứa Sales Order thật từ Tầng 1.
-                  Phase 0 dùng Delay thật + tạo OEE/Revenue giả lập có tương quan.
-    --data      : (tùy chọn) Đường dẫn file CSV/Excel chứa dataset hoàn chỉnh.
-                  Yêu cầu: cột Date, OEE_Score, DelayRate, Revenue, OrderVolume.
-                  Bỏ qua Phase 0 hoàn toàn.
+    --delay-csv  : (tùy chọn) Đường dẫn CSV chứa Sales Order thật từ Tầng 1.
+                   Phase 0 dùng Delay thật + tạo OEE/Revenue giả lập có tương quan.
+    --data       : (tùy chọn) Đường dẫn file CSV/Excel chứa dataset hoàn chỉnh.
+                   Yêu cầu: cột Date, OEE_Score, DelayRate, Revenue, OrderVolume.
+                   Bỏ qua Phase 0 hoàn toàn.
     --stop-after : (tùy chọn) Dừng pipeline sau Phase chỉ định.
-    --seed      : (tùy chọn) Random seed cho Phase 0 (mặc định: 42).
+    --resume-from: (tùy chọn) Tiếp tục từ Phase chỉ định, bỏ qua các Phase
+                   trước nếu output đã tồn tại từ lần chạy trước.
+    --seed       : (tùy chọn) Random seed cho Phase 0 (mặc định: 42).
 
     Lưu ý: --data và --delay-csv loại trừ nhau. Không truyền cả hai.
 
@@ -44,6 +49,7 @@ Tuân thủ: CLAUDE.md mục 3 (Coding), mục 7 (Logging), mục 3.5 (Reproduci
 """
 
 import argparse
+import json
 import os
 import sys
 import time
@@ -199,7 +205,12 @@ def _print_summary(results: dict, total_time: float, logger):
     for phase_id, info in results.items():
         status = info["status"]
         elapsed = info.get("elapsed", 0)
-        icon = "OK" if status == "success" else ("SKIP" if status == "skipped" else "FAIL")
+        if status == "success":
+            icon = "OK"
+        elif status in ("skipped", "skipped (resume)"):
+            icon = "SKIP"
+        else:
+            icon = "FAIL"
         logger.info(f"  [{icon:>4}]  {phase_id:<10} — {info['label']:<45} ({_format_elapsed(elapsed)})")
 
     logger.info("-" * 62)
@@ -231,6 +242,86 @@ def _print_summary(results: dict, total_time: float, logger):
     logger.info("")
     logger.info(f"  Thư mục gốc: {BASE_DIR}")
     logger.info("=" * 62)
+
+
+# Mapping Phase → file output kỳ vọng (dùng cho checkpoint/resume)
+PHASE_OUTPUT_FILES = {
+    "Phase 0":  "data/processed/causal_weekly_dataset.csv",
+    "Phase 1":  "reports/phase1_stationarity.json",
+    "Phase 2":  "reports/phase2_granger_causality.json",
+    "Phase 3":  "reports/phase3_cointegration.json",
+    "Phase 3b": "reports/phase3b_toda_yamamoto.json",
+    "Phase 4":  "reports/tang4_vecm_results.json",
+    "Phase 5":  "reports/phase5_irf_fevd_results.json",
+}
+
+
+def _can_skip_phase(phase_id: str, logger) -> bool:
+    """
+    Kiểm tra Phase có thể bỏ qua (đã chạy thành công trước đó) dựa trên
+    sự tồn tại và tính hợp lệ của file output kỳ vọng.
+
+    Dùng cho --resume-from: các Phase trước điểm resume được bỏ qua nếu
+    output đã tồn tại, tránh chạy lại toàn bộ pipeline khi chỉ cần debug
+    Phase 3 trở đi.
+    """
+    output_rel = PHASE_OUTPUT_FILES.get(phase_id)
+    if not output_rel:
+        return False
+
+    output_path = BASE_DIR / output_rel
+    if not output_path.exists():
+        logger.warning(
+            f"  ⚠ {phase_id}: output kỳ vọng '{output_rel}' không tồn tại "
+            f"— KHÔNG thể bỏ qua, phải chạy lại."
+        )
+        return False
+
+    # Kiểm tra file không rỗng
+    if output_path.stat().st_size == 0:
+        logger.warning(
+            f"  ⚠ {phase_id}: output '{output_rel}' tồn tại nhưng rỗng "
+            f"— KHÔNG thể bỏ qua."
+        )
+        return False
+
+    logger.info(
+        f"  ⏭ {phase_id}: bỏ qua — output '{output_rel}' đã tồn tại "
+        f"từ lần chạy trước."
+    )
+    return True
+
+
+def log_phase_transition(phase_from: str, phase_to: str, status: str,
+                         elapsed: float, logger, extra: dict = None):
+    """
+    Ghi log chuyển tiếp giữa các Phase theo định dạng JSON có cấu trúc.
+
+    Mỗi lần Phase hoàn tất (thành công hoặc thất bại), hàm này ghi 1 dòng
+    JSON vào file reports/logs/phase_transitions.jsonl — giúp giám sát và
+    phân tích pipeline execution history một cách có hệ thống.
+    """
+    transition_dir = BASE_DIR / "reports" / "logs"
+    transition_dir.mkdir(parents=True, exist_ok=True)
+    transition_path = transition_dir / "phase_transitions.jsonl"
+
+    record = {
+        "timestamp": datetime.now().isoformat(),
+        "from": phase_from,
+        "to": phase_to,
+        "status": status,
+        "elapsed_seconds": round(elapsed, 2),
+    }
+    if extra:
+        record["extra"] = extra
+
+    with open(transition_path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    logger.debug(
+        f"Phase transition: {phase_from} → {phase_to} [{status}] "
+        f"({_format_elapsed(elapsed)})"
+    )
 
 
 # ===================================================================
@@ -318,6 +409,7 @@ def run_pipeline(
     delay_csv: str = None,
     seed: int = 42,
     stop_after: str = None,
+    resume_from: str = None,
 ):
     """
     Hàm chính điều phối toàn bộ pipeline từ Phase 0 đến Phase 5.
@@ -335,10 +427,13 @@ def run_pipeline(
     thất bại, pipeline dừng an toàn và in nguyên nhân chi tiết.
 
     Tham số:
-        data_path:  đường dẫn dataset hoàn chỉnh (.csv/.xlsx). Bỏ qua Phase 0.
-        delay_csv:  đường dẫn CSV Sales Order thật → Phase 0 hybrid mode.
-        seed:       random seed cho Phase 0 (mặc định: 42).
-        stop_after: dừng sau Phase chỉ định ('phase0'..'phase5'). None = chạy hết.
+        data_path:   đường dẫn dataset hoàn chỉnh (.csv/.xlsx). Bỏ qua Phase 0.
+        delay_csv:   đường dẫn CSV Sales Order thật → Phase 0 hybrid mode.
+        seed:        random seed cho Phase 0 (mặc định: 42).
+        stop_after:  dừng sau Phase chỉ định ('phase0'..'phase5'). None = chạy hết.
+        resume_from: tiếp tục từ Phase chỉ định, bỏ qua các Phase trước nếu
+                     output đã tồn tại. Hữu ích khi debug Phase cuối mà không
+                     cần chạy lại toàn bộ pipeline.
     """
     logger = get_logger("pipeline")
     pipeline_start = time.time()
@@ -346,8 +441,9 @@ def run_pipeline(
     _print_banner(logger)
     _ensure_output_dirs()
 
-    # Xác định điểm dừng
+    # Xác định điểm dừng và điểm tiếp tục
     max_phase_idx = STOP_POINTS.get(stop_after, len(PHASE_REGISTRY) - 1) if stop_after else len(PHASE_REGISTRY) - 1
+    resume_idx = STOP_POINTS.get(resume_from, 0) if resume_from else 0
 
     if data_path:
         mode = "DỮ LIỆU THẬT (bỏ qua Phase 0)"
@@ -359,6 +455,8 @@ def run_pipeline(
     logger.info(f"  Random seed : {seed}")
     if stop_after:
         logger.info(f"  Dừng sau    : {stop_after}")
+    if resume_from:
+        logger.info(f"  Tiếp tục từ : {resume_from}")
     logger.info(f"  Thời điểm   : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info("")
 
@@ -372,21 +470,28 @@ def run_pipeline(
     phase_id = "Phase 0"
     phase_label = PHASE_REGISTRY[0][1]
     if max_phase_idx >= 0:
-        logger.info(f"{'─' * 62}")
-        logger.info(f"  ▶ {phase_id}: {phase_label}")
-        logger.info(f"{'─' * 62}")
-        t0 = time.time()
-        try:
-            csv_path = _run_phase0(data_path, delay_csv, seed, logger)
-            elapsed = time.time() - t0
-            results[phase_id] = {"status": "success", "label": phase_label, "elapsed": elapsed}
-            logger.info(f"  ✓ {phase_id} hoàn tất ({_format_elapsed(elapsed)})")
-        except Exception:
-            elapsed = time.time() - t0
-            results[phase_id] = {"status": "failed", "label": phase_label, "elapsed": elapsed}
-            logger.exception(f"  ✗ {phase_id} THẤT BẠI — pipeline dừng lại")
-            _print_summary(results, time.time() - pipeline_start, logger)
-            return False
+        # --resume-from: bỏ qua Phase 0 nếu resume_idx > 0 và output đã có
+        if resume_idx > 0 and _can_skip_phase(phase_id, logger):
+            csv_path = str(BASE_DIR / PHASE_OUTPUT_FILES[phase_id])
+            results[phase_id] = {"status": "skipped (resume)", "label": phase_label, "elapsed": 0}
+        else:
+            logger.info(f"{'─' * 62}")
+            logger.info(f"  ▶ {phase_id}: {phase_label}")
+            logger.info(f"{'─' * 62}")
+            t0 = time.time()
+            try:
+                csv_path = _run_phase0(data_path, delay_csv, seed, logger)
+                elapsed = time.time() - t0
+                results[phase_id] = {"status": "success", "label": phase_label, "elapsed": elapsed}
+                log_phase_transition("start", phase_id, "success", elapsed, logger)
+                logger.info(f"  ✓ {phase_id} hoàn tất ({_format_elapsed(elapsed)})")
+            except Exception:
+                elapsed = time.time() - t0
+                results[phase_id] = {"status": "failed", "label": phase_label, "elapsed": elapsed}
+                log_phase_transition("start", phase_id, "failed", elapsed, logger)
+                logger.exception(f"  ✗ {phase_id} THẤT BẠI — pipeline dừng lại")
+                _print_summary(results, time.time() - pipeline_start, logger)
+                return False
     else:
         results[phase_id] = {"status": "skipped", "label": phase_label, "elapsed": 0}
 
@@ -407,9 +512,16 @@ def run_pipeline(
         (6, "Phase 5",  PHASE_REGISTRY[6][1], _run_phase5),
     ]
 
+    prev_phase = "Phase 0"
     for idx, phase_id, phase_label, phase_func in analysis_phases:
         if idx > max_phase_idx:
             results[phase_id] = {"status": "skipped", "label": phase_label, "elapsed": 0}
+            continue
+
+        # --resume-from: bỏ qua Phase trước điểm resume nếu output đã có
+        if idx < resume_idx and _can_skip_phase(phase_id, logger):
+            results[phase_id] = {"status": "skipped (resume)", "label": phase_label, "elapsed": 0}
+            prev_phase = phase_id
             continue
 
         logger.info("")
@@ -422,13 +534,17 @@ def run_pipeline(
             phase_func(csv_path, logger)
             elapsed = time.time() - t0
             results[phase_id] = {"status": "success", "label": phase_label, "elapsed": elapsed}
+            log_phase_transition(prev_phase, phase_id, "success", elapsed, logger)
             logger.info(f"  ✓ {phase_id} hoàn tất ({_format_elapsed(elapsed)})")
         except Exception:
             elapsed = time.time() - t0
             results[phase_id] = {"status": "failed", "label": phase_label, "elapsed": elapsed}
+            log_phase_transition(prev_phase, phase_id, "failed", elapsed, logger)
             logger.exception(f"  ✗ {phase_id} THẤT BẠI — pipeline dừng lại")
             _print_summary(results, time.time() - pipeline_start, logger)
             return False
+
+        prev_phase = phase_id
 
     # ---------------------------------------------------------------
     # TỔNG KẾT
@@ -459,6 +575,8 @@ def _build_parser() -> argparse.ArgumentParser:
             "  python main_pipeline.py --delay-csv data/raw/snapshot_.../cmt_delay_results.csv  # Hybrid\n"
             "  python main_pipeline.py --data real_data.xlsx                        # Dữ liệu thật hoàn chỉnh\n"
             "  python main_pipeline.py --stop-after phase3                         # Chỉ chạy đến Phase 3\n"
+            "  python main_pipeline.py --resume-from phase3                        # Tiếp tục từ Phase 3\n"
+            "  python main_pipeline.py --resume-from phase4 --stop-after phase4    # Chỉ chạy Phase 4\n"
         ),
     )
 
@@ -505,6 +623,20 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    parser.add_argument(
+        "--resume-from",
+        type=str,
+        default=None,
+        choices=list(STOP_POINTS.keys()),
+        metavar="PHASE",
+        help=(
+            "Tiếp tục pipeline từ Phase chỉ định, bỏ qua các Phase trước "
+            "nếu output đã tồn tại. Hữu ích khi debug Phase 3+ mà không "
+            "cần chạy lại Phase 0-2. "
+            "Lựa chọn: phase0, phase1, phase2, phase3, phase3b, phase4, phase5."
+        ),
+    )
+
     return parser
 
 
@@ -521,6 +653,7 @@ if __name__ == "__main__":
         delay_csv=args.delay_csv,
         seed=args.seed,
         stop_after=args.stop_after,
+        resume_from=args.resume_from,
     )
 
     sys.exit(0 if success else 1)

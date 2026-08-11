@@ -121,6 +121,18 @@ hay NaN giả.
 Mỗi dòng được đánh dấu `is_interpolated_oee`, `is_interpolated_delay` để
 Tầng 3 thực hiện kiểm định độ nhạy (sensitivity analysis).
 
+#### d) Forward-fill khoảng trống thời gian (Phase 0 Synthetic Pipeline)
+
+Khi gộp đơn hàng theo tuần, chuỗi có thể thiếu tuần (không có đơn hàng).
+Chiến lược xử lý:
+
+| Bước | Mô tả |
+|------|-------|
+| **Reindex** | Tạo lưới đều đặn `freq='W-MON'` từ tuần đầu đến tuần cuối |
+| **Forward-fill** | `ffill(limit=4)` — lấp tối đa 4 tuần liên tiếp |
+| **Đánh dấu** | Cột `is_filled` = True cho tuần được forward-fill |
+| **Drop** | Khoảng trống > 4 tuần giữ NaN → drop trước phân tích |
+
 #### c) Trọng số sản lượng (Weighted Average)
 
 Trung bình tuần dùng `np.average(OEE_Score, weights=RealQty)` — phản ánh
@@ -148,8 +160,15 @@ thuyết H₀ **ngược nhau** để giảm rủi ro sai lầm loại I/II.
 |-------------|-----------|----------|
 | Có | Có | **Dừng** (cả 2 đồng thuận) |
 | Không | Không | **Không dừng** (cả 2 đồng thuận) |
-| Có | Không | Mâu thuẫn → coi là dừng (bảo thủ) |
+| Có | Không | Mâu thuẫn → chạy **Zivot-Andrews** tiebreaker |
 | Không | Có | Không rõ ràng → coi là không dừng (an toàn) |
+
+**Xử lý trường hợp mâu thuẫn (Case 3) — Zivot-Andrews tiebreaker:**
+
+Khi ADF và KPSS cho kết quả mâu thuẫn, pipeline tự động chạy kiểm định
+**Zivot-Andrews (1992)** — cho phép 1 structural break nội sinh. Nếu ZA bác
+bỏ unit root → chuỗi dừng quanh break → kết luận "stationary". Nếu không →
+giữ "contradictory", tạm xử lý như dừng (bảo thủ).
 
 Bậc tích hợp d(i) được xác định bằng sai phân tuần tự (level → 1st diff →
 2nd diff) cho đến khi chuỗi dừng.
@@ -324,6 +343,32 @@ python scripts/phase3b_toda_yamamoto.py
 python scripts/tang4_vecm_forecasting.py
 ```
 
+### 4.2b. Chạy pipeline one-click (Orchestrator)
+
+```bash
+# Demo (full synthetic) — chạy toàn bộ Phase 0 → Phase 5
+python main_pipeline.py
+
+# Hybrid mode — Delay thật + OEE/Revenue giả lập
+python main_pipeline.py --delay-csv data/raw/snapshot_.../cmt_delay_results.csv
+
+# Dữ liệu thật hoàn chỉnh — bỏ qua Phase 0
+python main_pipeline.py --data real_data.xlsx
+
+# Chỉ chạy đến Phase 3 (debug kiểm định)
+python main_pipeline.py --stop-after phase3
+
+# Tiếp tục từ Phase 3 — bỏ qua Phase 0-2 nếu output đã có
+python main_pipeline.py --resume-from phase3
+
+# Chỉ chạy Phase 4 (kết hợp resume + stop)
+python main_pipeline.py --resume-from phase4 --stop-after phase4
+```
+
+**Tham số `--resume-from`:** Bỏ qua các Phase trước điểm chỉ định nếu file
+output kỳ vọng đã tồn tại từ lần chạy trước. Hữu ích khi debug Phase cuối
+mà không cần chạy lại toàn bộ pipeline.
+
 ### 4.3. Output chính
 
 | File | Nội dung |
@@ -401,3 +446,6 @@ Hybrid_Causal_Forecasting_3A/
 - Toda, H. Y. & Yamamoto, T. (1995). Statistical inference in vector
   autoregressions with possibly integrated processes. *Journal of
   Econometrics*, 66(1–2), 225–250.
+- Zivot, E. & Andrews, D. W. K. (1992). Further evidence on the Great
+  Crash, the oil-price shock, and the unit-root hypothesis. *Journal of
+  Business & Economic Statistics*, 10(3), 251–270.

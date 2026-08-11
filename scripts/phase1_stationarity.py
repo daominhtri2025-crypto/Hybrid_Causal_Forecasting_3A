@@ -52,7 +52,7 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
-from statsmodels.tsa.stattools import adfuller, kpss
+from statsmodels.tsa.stattools import adfuller, kpss, zivot_andrews
 
 from scripts.utils import get_logger, get_base_dir
 
@@ -165,7 +165,10 @@ def _run_adf_test(series, var_name, diff_label="level"):
             "ic_best": _safe_float(ic_best),
             "reject_h0": bool(reject_h0),
             "interpretation": "dừng (stationary)" if reject_h0
-                              else "không dừng (non-stationary)"
+                              else "không dừng (non-stationary)",
+            # Lưu chuỗi gốc để _dual_confirmation có thể truyền cho
+            # Zivot-Andrews khi cần tiebreaker (không serialize vào JSON)
+            "series_used": clean,
         }
 
     except Exception as e:
@@ -317,15 +320,51 @@ def _dual_confirmation(adf_result, kpss_result, var_name, diff_label):
     elif adf_rejects and kpss_rejects:
         # Case 3: Mâu thuẫn — ADF nói "dừng" nhưng KPSS cũng bác bỏ "dừng"
         # Thường xảy ra khi chuỗi dừng quanh một xu hướng (trend-stationary)
-        # hoặc có structural break. Mẫu nhỏ cũng dễ gây mâu thuẫn.
+        # hoặc có structural break. Dùng Zivot-Andrews (1992) làm tiebreaker:
+        # ZA cho phép 1 structural break nội sinh → nếu ZA bác bỏ H0 (unit
+        # root), kết luận chuỗi dừng quanh break → "stationary".
+        # Nếu ZA không bác bỏ → giữ "contradictory", tạm xử lý như dừng.
         logger.warning(
             f"{var_name} ({diff_label}): ⚠ KẾT QUẢ MÂU THUẪN — ADF bác bỏ "
-            f"unit root nhưng KPSS cũng bác bỏ stationarity. Có thể do: "
-            f"(1) chuỗi dừng quanh trend, (2) structural break, hoặc "
-            f"(3) mẫu quá nhỏ. Tạm xử lý như 'dừng' (bảo thủ — ưu tiên "
-            f"kết quả ADF vì Johansen yêu cầu I(1))."
+            f"unit root nhưng KPSS cũng bác bỏ stationarity. Chạy Zivot-Andrews "
+            f"làm tiebreaker (kiểm tra structural break)..."
         )
-        return "contradictory"
+        try:
+            za_result = zivot_andrews(
+                adf_result["series_used"], maxlag=None, regression="c", autolag="AIC"
+            )
+            za_stat = float(za_result[0])
+            za_pvalue = float(za_result[1])
+            za_breakpoint = int(za_result[4])
+            za_rejects = za_pvalue < SIGNIFICANCE_LEVEL
+
+            logger.info(
+                f"{var_name} ({diff_label}): Zivot-Andrews — "
+                f"stat={za_stat:.4f}, p={za_pvalue:.4f}, "
+                f"breakpoint tại index {za_breakpoint}. "
+                f"{'Bác bỏ' if za_rejects else 'Giữ'} H0 (unit root)."
+            )
+
+            if za_rejects:
+                logger.info(
+                    f"{var_name} ({diff_label}): ZA xác nhận DỪNG (có "
+                    f"structural break) → kết luận 'stationary'."
+                )
+                return "stationary"
+            else:
+                logger.warning(
+                    f"{var_name} ({diff_label}): ZA không bác bỏ unit root → "
+                    f"giữ 'contradictory', tạm xử lý như 'dừng' (bảo thủ — "
+                    f"ưu tiên ADF vì Johansen yêu cầu I(1))."
+                )
+                return "contradictory"
+        except Exception as e:
+            # ZA thất bại (mẫu quá nhỏ, hoặc lỗi hội tụ) → fallback
+            logger.warning(
+                f"{var_name} ({diff_label}): Zivot-Andrews thất bại ({e}) — "
+                f"fallback về 'contradictory', tạm xử lý như 'dừng'."
+            )
+            return "contradictory"
 
     else:
         # Case 4: Cả hai đều không bác bỏ — không đủ bằng chứng kết luận
@@ -712,6 +751,17 @@ def run_phase1(input_path=None):
     # -----------------------------------------------------------------
     # Bước 6: Ghi kết quả ra JSON (reports/phase1_stationarity.json)
     # -----------------------------------------------------------------
+    # Loại bỏ trường series_used (pd.Series) khỏi kết quả trước khi
+    # serialize — trường này chỉ dùng nội bộ cho Zivot-Andrews tiebreaker,
+    # không cần lưu vào JSON.
+    for _var, _vdata in var_results.items():
+        if "tests" in _vdata:
+            for _diff_label, _tdata in _vdata["tests"].items():
+                if isinstance(_tdata, dict):
+                    for _test_key in ("adf", "kpss"):
+                        if isinstance(_tdata.get(_test_key), dict):
+                            _tdata[_test_key].pop("series_used", None)
+
     output = {
         "metadata": {
             "script": "phase1_stationarity.py",
@@ -720,7 +770,7 @@ def run_phase1(input_path=None):
             "n_observations": n_obs,
             "date_range": {"start": date_start, "end": date_end},
             "significance_level": SIGNIFICANCE_LEVEL,
-            "method": "ADF+KPSS dual confirmation (Pfaff, 2008)",
+            "method": "ADF+KPSS dual confirmation (Pfaff, 2008) + Zivot-Andrews tiebreaker",
             "adf_regression": "c (constant, no trend)",
             "kpss_regression": "c (level stationarity)",
             "adf_autolag": "AIC"

@@ -1,22 +1,22 @@
 {
   "metadata": {
     "script": "phase3_cointegration.py",
-    "timestamp": "2026-08-11T02:52:57.173247",
+    "timestamp": "2026-08-11T03:28:13.383663",
     "input_file": "data/processed/causal_weekly_dataset.csv",
     "phase1_file": "reports/phase1_stationarity.json",
-    "n_observations": 6,
+    "n_observations": 399,
     "significance_level": 0.05,
     "d_values_from_phase1": {
-      "OEE_Score": 0,
+      "OEE_Score": 1,
       "DelayRate": 1,
-      "Revenue": 2,
+      "Revenue": 1,
       "OrderVolume": 1
     },
-    "d_max": 2,
+    "d_max": 1,
     "method": "Johansen cointegration (Trace + Max-Eigenvalue)",
     "det_order": 1,
     "det_order_description": "Unrestricted constant (no trend) — Lütkepohl 2005",
-    "applicability": "mixed_order"
+    "applicability": "applicable"
   },
   "lag_selection": {
     "selected_lag": 1,
@@ -24,43 +24,103 @@
   },
   "johansen_result": {
     "trace_test": {
-      "rank": 0,
+      "rank": 4,
       "details": [
         {
           "h0": "r ≤ 0",
-          "statistic": NaN,
+          "statistic": 478.48568649152594,
           "critical_values": {
             "90%": 51.6492,
             "95%": 55.2459,
             "99%": 62.5202
           },
-          "reject_h0_at_5pct": false
+          "reject_h0_at_5pct": true
+        },
+        {
+          "h0": "r ≤ 1",
+          "statistic": 178.7553055284269,
+          "critical_values": {
+            "90%": 32.0645,
+            "95%": 35.0116,
+            "99%": 41.0815
+          },
+          "reject_h0_at_5pct": true
+        },
+        {
+          "h0": "r ≤ 2",
+          "statistic": 38.90889595587672,
+          "critical_values": {
+            "90%": 16.1619,
+            "95%": 18.3985,
+            "99%": 23.1485
+          },
+          "reject_h0_at_5pct": true
+        },
+        {
+          "h0": "r ≤ 3",
+          "statistic": 12.698240674904554,
+          "critical_values": {
+            "90%": 2.7055,
+            "95%": 3.8415,
+            "99%": 6.6349
+          },
+          "reject_h0_at_5pct": true
         }
       ]
     },
     "max_eigenvalue_test": {
-      "rank": 0,
+      "rank": 4,
       "details": [
         {
           "h0": "r = 0",
-          "statistic": NaN,
+          "statistic": 299.730380963099,
           "critical_values": {
             "90%": 28.2398,
             "95%": 30.8151,
             "99%": 36.193
           },
-          "reject_h0_at_5pct": false
+          "reject_h0_at_5pct": true
+        },
+        {
+          "h0": "r = 1",
+          "statistic": 139.8464095725502,
+          "critical_values": {
+            "90%": 21.8731,
+            "95%": 24.2522,
+            "99%": 29.2631
+          },
+          "reject_h0_at_5pct": true
+        },
+        {
+          "h0": "r = 2",
+          "statistic": 26.21065528097217,
+          "critical_values": {
+            "90%": 15.0006,
+            "95%": 17.1481,
+            "99%": 21.7465
+          },
+          "reject_h0_at_5pct": true
+        },
+        {
+          "h0": "r = 3",
+          "statistic": 12.698240674904554,
+          "critical_values": {
+            "90%": 2.7055,
+            "95%": 3.8415,
+            "99%": 6.6349
+          },
+          "reject_h0_at_5pct": true
         }
       ]
     },
     "eigenvalues": [
-      1.0000000000024951,
-      1.0000000000000027,
-      0.9999999999999962,
-      0.9999999999975068
+      0.5290914708512346,
+      0.2962787045642551,
+      0.06373424618854698,
+      0.03140152875070469
     ],
     "rank_agreement": "consistent",
-    "coint_rank": 0,
+    "coint_rank": 4,
     "n_variables": 4,
     "variable_names": [
       "OEE_Score",
@@ -68,14 +128,14 @@
       "Revenue",
       "OrderVolume"
     ],
-    "route": "VAR_on_differences",
-    "route_explanation": "r = 0 (không đồng tích hợp): không có quan hệ cân bằng dài hạn → dùng VAR trên chuỗi ĐÃ SAI PHÂN.",
+    "route": "VAR_on_levels",
+    "route_explanation": "r = 4 (full rank): tất cả biến dừng ở mức → dùng VAR trên chuỗi MỨC (levels).",
     "det_order": 1,
     "k_ar_diff": 0
   },
-  "coint_rank": 0,
-  "route": "VAR_on_differences",
-  "route_explanation": "r = 0 (không đồng tích hợp): không có quan hệ cân bằng dài hạn → dùng VAR trên chuỗi ĐÃ SAI PHÂN.",
+  "coint_rank": 4,
+  "route": "VAR_on_levels",
+  "route_explanation": "r = 4 (full rank): tất cả biến dừng ở mức → dùng VAR trên chuỗi MỨC (levels).",
   "sensitivity_analysis": {
     "description": "Không có tuần nội suy — kết quả giống hoàn toàn.",
     "discrepancies": []

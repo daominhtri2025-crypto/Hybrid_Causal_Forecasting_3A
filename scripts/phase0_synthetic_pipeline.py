@@ -320,10 +320,54 @@ class CausalDatasetBuilder:
                 f"đơn hàng (DelayRate không đáng tin cậy)."
             )
 
+        # --- Forward-fill khoảng trống thời gian (Strategy A) ---
+        # Reindex chuỗi tuần về lưới đều đặn (mỗi tuần 1 dòng), lấp đầy
+        # khoảng trống bằng forward-fill tối đa 4 tuần liên tiếp.
+        # Vượt 4 tuần → giữ NaN (structural gap, không nên nội suy).
+        # Cột is_filled đánh dấu dòng được lấp để Phase 1 sensitivity analysis
+        # có thể đánh giá tác động của gap-filling lên kết quả kiểm định.
+        MAX_FFILL_WEEKS = 4
+        weekly["week_start"] = pd.to_datetime(weekly["week_start"])
+        full_range = pd.date_range(
+            start=weekly["week_start"].min(),
+            end=weekly["week_start"].max(),
+            freq="W-MON",
+            name="week_start",
+        )
+        weekly = weekly.set_index("week_start").reindex(full_range)
+        weekly.index.name = "week_start"
+
+        # Đánh dấu dòng được forward-fill TRƯỚC KHI fill
+        is_gap = weekly["DelayRate"].isna()
+        weekly["DelayRate"] = weekly["DelayRate"].ffill(limit=MAX_FFILL_WEEKS)
+        weekly["order_count"] = weekly["order_count"].ffill(limit=MAX_FFILL_WEEKS)
+
+        # is_filled = True cho dòng ban đầu là NaN nhưng đã được fill thành công
+        weekly["is_filled"] = is_gap & weekly["DelayRate"].notna()
+
+        # Loại bỏ dòng vẫn còn NaN (gap > 4 tuần, không fill được)
+        n_remaining_gaps = weekly["DelayRate"].isna().sum()
+        if n_remaining_gaps > 0:
+            logger.warning(
+                f"[Delay] {n_remaining_gaps} tuần có khoảng trống > "
+                f"{MAX_FFILL_WEEKS} tuần — giữ NaN, không forward-fill."
+            )
+            weekly = weekly.dropna(subset=["DelayRate"])
+
+        n_filled = int(weekly["is_filled"].sum())
+        weekly = weekly.reset_index()
+
+        if n_filled > 0:
+            logger.info(
+                f"[Delay] Forward-fill: lấp {n_filled} tuần trống "
+                f"(tối đa {MAX_FFILL_WEEKS} tuần liên tiếp)."
+            )
+
         logger.info(
             f"[Delay] Gộp tuần xong: {len(weekly):,} tuần, "
             f"trung bình {weekly['order_count'].mean():.1f} đơn/tuần, "
-            f"DelayRate trung bình = {weekly['DelayRate'].mean():.1%}."
+            f"DelayRate trung bình = {weekly['DelayRate'].mean():.1%}, "
+            f"trong đó {n_filled} tuần là forward-filled."
         )
 
         return weekly
@@ -747,15 +791,23 @@ class CausalDatasetBuilder:
             self._metadata["variables"]["Revenue"] = {"source": "real"}
 
         # --- Xây dựng DataFrame output ---
+        # Cột is_filled từ orders_to_weekly_delay() đánh dấu tuần được
+        # forward-fill — truyền sang dataset để Phase 1 sensitivity analysis.
+        is_filled_delay = (
+            delay_weekly["is_filled"].astype(int).values
+            if "is_filled" in delay_weekly.columns
+            else np.zeros(len(delay_weekly), dtype=int)
+        )
+
         dataset = pd.DataFrame({
             "week_start": delay_weekly["week_start"].values,
             "OEE_Score": oee_series.values,
             "DelayRate": delay_weekly["DelayRate"].values,
             "Revenue": revenue_series.values,
             "OrderVolume": delay_weekly["order_count"].values,
-            # Dữ liệu mô phỏng hoàn chỉnh — không cần nội suy
             "is_interpolated_oee": 0,
             "is_interpolated_delay": 0,
+            "is_filled_delay": is_filled_delay,
         })
 
         dataset = dataset.sort_values("week_start").reset_index(drop=True)

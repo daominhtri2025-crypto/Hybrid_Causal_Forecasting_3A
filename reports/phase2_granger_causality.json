@@ -1,16 +1,16 @@
 {
   "metadata": {
     "script": "phase2_granger_causality.py",
-    "timestamp": "2026-08-11T02:52:57.153968",
+    "timestamp": "2026-08-11T03:27:57.239180",
     "input_file": "data/processed/causal_weekly_dataset.csv",
     "phase1_file": "reports/phase1_stationarity.json",
-    "n_observations_raw": 6,
-    "n_observations_after_diff": 4,
+    "n_observations_raw": 399,
+    "n_observations_after_diff": 398,
     "significance_level": 0.05,
     "d_values_from_phase1": {
-      "OEE_Score": 0,
+      "OEE_Score": 1,
       "DelayRate": 1,
-      "Revenue": 2,
+      "Revenue": 1,
       "OrderVolume": 1
     },
     "method": "Granger causality (F-test) on differenced series"
@@ -24,80 +24,228 @@
     {
       "cause": "OEE_Score",
       "effect": "DelayRate",
-      "skipped": true,
-      "reason": "Insufficient observations. Maximum allowable lag is 0"
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 3.0838191793855234,
+          "p_value": 0.07985157523264068,
+          "df_numerator": 1,
+          "df_denominator": 394,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.07985157523264068,
+      "significant": false,
+      "conclusion": "OEE_Score KHÔNG Granger-cause DelayRate (p_min=0.0799)"
     },
     {
       "cause": "OEE_Score",
       "effect": "Revenue",
-      "skipped": true,
-      "reason": "Insufficient observations. Maximum allowable lag is 0"
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 15.996122926405578,
+          "p_value": 7.580596339671953e-05,
+          "df_numerator": 1,
+          "df_denominator": 394,
+          "significant": true
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 7.580596339671953e-05,
+      "significant": true,
+      "conclusion": "OEE_Score Granger-cause Revenue tại lag=1 (p=0.0001)"
     },
     {
       "cause": "OEE_Score",
       "effect": "OrderVolume",
-      "skipped": true,
-      "reason": "Insufficient observations. Maximum allowable lag is 0"
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 0.0018598054139815836,
+          "p_value": 0.965623369499831,
+          "df_numerator": 1,
+          "df_denominator": 394,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.965623369499831,
+      "significant": false,
+      "conclusion": "OEE_Score KHÔNG Granger-cause OrderVolume (p_min=0.9656)"
     },
     {
       "cause": "DelayRate",
       "effect": "OEE_Score",
-      "skipped": true,
-      "reason": "Insufficient observations. Maximum allowable lag is 0"
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 0.7964474596409262,
+          "p_value": 0.3727023723648025,
+          "df_numerator": 1,
+          "df_denominator": 394,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.3727023723648025,
+      "significant": false,
+      "conclusion": "DelayRate KHÔNG Granger-cause OEE_Score (p_min=0.3727)"
     },
     {
       "cause": "DelayRate",
       "effect": "Revenue",
-      "skipped": true,
-      "reason": "Insufficient observations. Maximum allowable lag is 0"
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 1.7580177188304416,
+          "p_value": 0.18564013182832603,
+          "df_numerator": 1,
+          "df_denominator": 394,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.18564013182832603,
+      "significant": false,
+      "conclusion": "DelayRate KHÔNG Granger-cause Revenue (p_min=0.1856)"
     },
     {
       "cause": "DelayRate",
       "effect": "OrderVolume",
-      "skipped": true,
-      "reason": "Insufficient observations. Maximum allowable lag is 0"
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 0.07868600099023168,
+          "p_value": 0.7792332911571725,
+          "df_numerator": 1,
+          "df_denominator": 394,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.7792332911571725,
+      "significant": false,
+      "conclusion": "DelayRate KHÔNG Granger-cause OrderVolume (p_min=0.7792)"
     },
     {
       "cause": "Revenue",
       "effect": "OEE_Score",
-      "skipped": true,
-      "reason": "Insufficient observations. Maximum allowable lag is 0"
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 4.722195252468689,
+          "p_value": 0.030370912006163056,
+          "df_numerator": 1,
+          "df_denominator": 394,
+          "significant": true
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.030370912006163056,
+      "significant": true,
+      "conclusion": "Revenue Granger-cause OEE_Score tại lag=1 (p=0.0304)"
     },
     {
       "cause": "Revenue",
       "effect": "DelayRate",
-      "skipped": true,
-      "reason": "Insufficient observations. Maximum allowable lag is 0"
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 13.708830695878063,
+          "p_value": 0.000243874198164773,
+          "df_numerator": 1,
+          "df_denominator": 394,
+          "significant": true
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.000243874198164773,
+      "significant": true,
+      "conclusion": "Revenue Granger-cause DelayRate tại lag=1 (p=0.0002)"
     },
     {
       "cause": "Revenue",
       "effect": "OrderVolume",
-      "skipped": true,
-      "reason": "Insufficient observations. Maximum allowable lag is 0"
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 2.6308139711890277,
+          "p_value": 0.10560786301980003,
+          "df_numerator": 1,
+          "df_denominator": 394,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.10560786301980003,
+      "significant": false,
+      "conclusion": "Revenue KHÔNG Granger-cause OrderVolume (p_min=0.1056)"
     },
     {
       "cause": "OrderVolume",
       "effect": "OEE_Score",
-      "skipped": true,
-      "reason": "Insufficient observations. Maximum allowable lag is 0"
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 0.2738229048495359,
+          "p_value": 0.6010729541059677,
+          "df_numerator": 1,
+          "df_denominator": 394,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.6010729541059677,
+      "significant": false,
+      "conclusion": "OrderVolume KHÔNG Granger-cause OEE_Score (p_min=0.6011)"
     },
     {
       "cause": "OrderVolume",
       "effect": "DelayRate",
-      "skipped": true,
-      "reason": "Insufficient observations. Maximum allowable lag is 0"
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 0.18015328442699424,
+          "p_value": 0.6714732099022138,
+          "df_numerator": 1,
+          "df_denominator": 394,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.6714732099022138,
+      "significant": false,
+      "conclusion": "OrderVolume KHÔNG Granger-cause DelayRate (p_min=0.6715)"
     },
     {
       "cause": "OrderVolume",
       "effect": "Revenue",
-      "skipped": true,
-      "reason": "Insufficient observations. Maximum allowable lag is 0"
+      "skipped": false,
+      "lag_results": {
+        "1": {
+          "f_statistic": 0.47261315836019674,
+          "p_value": 0.4921919191512921,
+          "df_numerator": 1,
+          "df_denominator": 394,
+          "significant": false
+        }
+      },
+      "best_lag": 1,
+      "best_p_value": 0.4921919191512921,
+      "significant": false,
+      "conclusion": "OrderVolume KHÔNG Granger-cause Revenue (p_min=0.4922)"
     }
   ],
   "summary": {
-    "total_pairs_tested": 0,
-    "significant_pairs": 0,
-    "significant_list": []
+    "total_pairs_tested": 12,
+    "significant_pairs": 3,
+    "significant_list": [
+      "OEE_Score → Revenue",
+      "Revenue → OEE_Score",
+      "Revenue → DelayRate"
+    ]
   },
   "sensitivity_analysis": {
     "description": "Không có tuần nội suy — kết quả giống hoàn toàn.",

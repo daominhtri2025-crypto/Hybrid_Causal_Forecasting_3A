@@ -228,3 +228,78 @@ def get_logger(phase_name: str) -> logging.Logger:
   dùng WARNING) — phân cấp sai sẽ làm nhiễu khi rà soát log về sau.
 - Khi bắt exception, luôn dùng `logger.exception("...")` (tự động kèm traceback)
   thay vì `logger.error(str(e))` (chỉ có thông điệp lỗi, mất traceback).
+
+---
+
+## 8. Chiến lược xử lý khoảng trống thời gian (Gap Handling)
+
+### 8.1. Forward-fill có giới hạn (Strategy A)
+
+Khi gộp đơn hàng theo tuần (`orders_to_weekly_delay()`), chuỗi thời gian có
+thể thiếu tuần (tuần không có đơn hàng nào). Chiến lược xử lý:
+
+1. **Reindex** chuỗi tuần về lưới đều đặn (mỗi tuần 1 dòng, `freq='W-MON'`).
+2. **Forward-fill** (`ffill`) tối đa **4 tuần liên tiếp** — giả định trạng
+   thái không đổi trong ngắn hạn.
+3. **Giữ NaN** cho khoảng trống > 4 tuần — đây là structural gap, không nên
+   nội suy (sẽ bị drop trước khi phân tích).
+4. **Đánh dấu** cột `is_filled` (`True` = dòng được forward-fill) để Phase 1
+   sensitivity analysis đánh giá tác động.
+
+### 8.2. Tại sao limit = 4 tuần
+
+4 tuần ≈ 1 tháng — khoảng trống ngắn hơn 1 tháng thường do nghỉ lễ, bảo trì,
+hoặc dao động tự nhiên trong sản xuất. Khoảng trống dài hơn có thể do ngừng
+sản xuất, thay đổi cơ cấu — forward-fill sẽ gây bias.
+
+---
+
+## 9. Kiểm định Zivot-Andrews cho trường hợp ADF/KPSS mâu thuẫn
+
+### 9.1. Quy trình
+
+Khi ADF và KPSS cho kết quả **mâu thuẫn** (Case 3: ADF bác bỏ unit root NHƯNG
+KPSS cũng bác bỏ stationarity), pipeline tự động chạy kiểm định
+**Zivot-Andrews (1992)** làm tiebreaker:
+
+- ZA cho phép **1 structural break nội sinh** — không cần biết trước vị trí break.
+- Nếu ZA bác bỏ H0 (unit root) → chuỗi dừng quanh break → kết luận **stationary**.
+- Nếu ZA không bác bỏ → giữ **contradictory**, tạm xử lý như dừng (bảo thủ).
+- Nếu ZA thất bại (mẫu quá nhỏ) → fallback về contradictory.
+
+### 9.2. Tham chiếu
+
+Zivot, E. & Andrews, D. W. K. (1992). Further evidence on the Great Crash,
+the oil-price shock, and the unit-root hypothesis. *Journal of Business &
+Economic Statistics*, 10(3), 251–270.
+
+---
+
+## 10. Checkpoint & Resume (`--resume-from`)
+
+### 10.1. Cách dùng
+
+```bash
+# Tiếp tục từ Phase 3 — bỏ qua Phase 0, 1, 2 nếu output đã có
+python main_pipeline.py --resume-from phase3
+
+# Kết hợp: chỉ chạy Phase 4
+python main_pipeline.py --resume-from phase4 --stop-after phase4
+```
+
+### 10.2. Cơ chế
+
+- Mỗi Phase có file output kỳ vọng (xem `PHASE_OUTPUT_FILES` trong
+  `main_pipeline.py`).
+- Khi `--resume-from` được truyền, các Phase **trước** điểm resume sẽ kiểm tra
+  xem output đã tồn tại và không rỗng → nếu có, bỏ qua (status = `skipped (resume)`).
+- Nếu output không tồn tại → Phase đó **vẫn chạy** (không crash).
+- `log_phase_transition()` ghi nhật ký chuyển tiếp giữa các Phase vào
+  `reports/logs/phase_transitions.jsonl` (định dạng JSONL, 1 dòng/transition).
+
+### 10.3. Lưu ý
+
+- `--resume-from` **không đảm bảo** kết quả Phase trước vẫn hợp lệ — nếu đã
+  thay đổi dữ liệu đầu vào hoặc tham số, nên chạy lại từ đầu.
+- Dùng chủ yếu để **debug** và **phát triển** — trong production nên chạy
+  toàn bộ pipeline.

@@ -1,13 +1,15 @@
 {
   "seed": 42,
-  "created_at": "2026-08-11T02:52:48.082318",
+  "created_at": "2026-08-11T03:27:49.054210",
   "script": "phase0_synthetic_pipeline.py",
   "strategy": "Hướng 4 — Hybrid (Delay thật/mô phỏng + OEE/Revenue mô phỏng)",
   "variables": {
     "DelayRate": {
-      "source": "real",
-      "source_file": "cmt_delay_results.csv",
-      "n_orders": 19
+      "source": "simulated",
+      "method": "Binomial sampling, time-varying probability, QTDN distribution",
+      "n_orders": 3774,
+      "n_weeks": 399,
+      "mean_delay_rate": 0.3533
     },
     "OEE_Score": {
       "source": "synthetic",
@@ -25,10 +27,10 @@
         ]
       },
       "stats": {
-        "mean": 0.7921,
-        "std": 0.0072,
-        "min": 0.7821,
-        "max": 0.8039
+        "mean": 0.7909,
+        "std": 0.1341,
+        "min": 0.65,
+        "max": 0.95
       }
     },
     "Revenue": {
@@ -44,19 +46,19 @@
         "growth_rate_per_week": 0.001
       },
       "stats": {
-        "mean": 557939041.0,
-        "std": 16385573.0,
-        "min": 540893364.0,
-        "max": 577575123.0
+        "mean": 297753750.0,
+        "std": 191290844.0,
+        "min": 100410755.0,
+        "max": 741900221.0
       }
     }
   },
   "output": {
     "csv_path": "/home/user/Hybrid_Causal_Forecasting_3A/data/processed/causal_weekly_dataset.csv",
-    "n_weeks": 6,
+    "n_weeks": 399,
     "date_range": {
-      "start": "2026-06-01 00:00:00",
-      "end": "2026-08-17 00:00:00"
+      "start": "2018-01-29 00:00:00",
+      "end": "2026-01-05 00:00:00"
     },
     "columns": [
       "week_start",
@@ -65,7 +67,8 @@
       "Revenue",
       "OrderVolume",
       "is_interpolated_oee",
-      "is_interpolated_delay"
+      "is_interpolated_delay",
+      "is_filled_delay"
     ]
   }
 }
