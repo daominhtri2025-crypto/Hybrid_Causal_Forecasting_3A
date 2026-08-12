@@ -3,7 +3,7 @@ Tầng 3 — Phase 2: Kiểm định nhân quả Granger (Granger Causality Test
 
 Mục đích:
     Kiểm tra quan hệ nhân quả Granger (Granger, 1969) giữa các cặp biến
-    trong hệ thống: OEE_Score, DelayRate, Revenue, OrderVolume.
+    trong hệ thống: ProductionVolume, DelayRate, OrderDemand.
 
     Nhân quả Granger KHÔNG phải nhân quả thực sự (true causation) — nó chỉ
     kiểm tra xem biến X có giúp DỰ BÁO biến Y tốt hơn hay không, khi đã
@@ -60,7 +60,7 @@ logger = get_logger("phase2")
 
 SIGNIFICANCE_LEVEL = 0.05
 
-ANALYSIS_VARS = ["OEE_Score", "DelayRate", "Revenue", "OrderVolume"]
+ANALYSIS_VARS = ["ProductionVolume", "DelayRate", "OrderDemand"]
 
 # Số lag tối đa để kiểm tra trong Granger test.
 # TẠI SAO maxlag là hàm của kích thước mẫu:
@@ -112,8 +112,8 @@ def _difference_series(df, d_values):
     Sai phân từng biến theo đúng bậc d(i) từ Phase 1.
 
     TẠI SAO sai phân riêng theo d(i) của từng biến (thay vì chung 1 bậc):
-        Các biến kinh tế có thể có bậc tích hợp KHÁC NHAU (vd: Revenue là
-        I(1) nhưng OEE_Score là I(0)). Nếu sai phân tất cả cùng 1 bậc:
+        Các biến kinh tế có thể có bậc tích hợp KHÁC NHAU (vd: OrderDemand là
+        I(1) nhưng DelayRate là I(0)). Nếu sai phân tất cả cùng 1 bậc:
         - Biến I(0) bị sai phân thừa (overdifferencing) → thêm nhiễu,
           mất thông tin tần số thấp.
         - Biến I(1) nếu không sai phân → chuỗi không dừng → Granger test
@@ -209,8 +209,8 @@ def _run_pairwise_granger(df_diff, max_lag):
     Chạy kiểm định Granger causality cho MỌI cặp biến (theo cả 2 chiều).
 
     Với n biến, có n*(n-1) cặp có hướng (X→Y khác Y→X). Ví dụ:
-        - OEE_Score → Revenue: "Hiệu suất sản xuất có giúp dự báo doanh thu?"
-        - Revenue → OEE_Score: "Doanh thu có giúp dự báo hiệu suất sản xuất?"
+        - OrderDemand → ProductionVolume: "Nhu cầu đơn hàng có giúp dự báo sản lượng?"
+        - ProductionVolume → DelayRate: "Sản lượng có giúp dự báo tỷ lệ trễ?"
     Hai câu hỏi này ĐỘC LẬP — nhân quả Granger KHÔNG đối xứng.
 
     statsmodels.grangercausalitytests:
@@ -334,13 +334,13 @@ def _run_pairwise_granger(df_diff, max_lag):
 
 def _run_sensitivity_analysis(df, d_values, max_lag, full_results):
     """
-    Loại tuần nội suy, chạy lại Granger, so sánh với kết quả đầy đủ.
+    Loại tuần forward-fill, chạy lại Granger, so sánh với kết quả đầy đủ.
 
     So sánh dựa trên: cặp nào CÓ ý nghĩa (significant) thay đổi giữa
     2 lần chạy (đầy đủ vs. sạch) → đó là cặp mà kết luận nhân quả PHỤ
-    THUỘC vào bước nội suy ở Phase 0.
+    THUỘC vào bước forward-fill ở Phase 0.
     """
-    interp_cols = [c for c in df.columns if c.startswith("is_interpolated")]
+    interp_cols = [c for c in df.columns if c.startswith("is_filled")]
     if not interp_cols:
         return None
 
@@ -349,7 +349,7 @@ def _run_sensitivity_analysis(df, d_values, max_lag, full_results):
 
     if n_excluded == 0:
         return {
-            "description": "Không có tuần nội suy — kết quả giống hoàn toàn.",
+            "description": "Không có tuần forward-fill — kết quả giống hoàn toàn.",
             "discrepancies": []
         }
 
@@ -357,7 +357,7 @@ def _run_sensitivity_analysis(df, d_values, max_lag, full_results):
     n_clean = len(df_clean)
 
     logger.info(
-        f"\n--- SENSITIVITY: loại {n_excluded} tuần nội suy, còn {n_clean} tuần ---"
+        f"\n--- SENSITIVITY: loại {n_excluded} tuần forward-fill, còn {n_clean} tuần ---"
     )
 
     # Sai phân dataset sạch
@@ -399,7 +399,7 @@ def _run_sensitivity_analysis(df, d_values, max_lag, full_results):
                 "clean_significant": clean_sig,
                 "warning": (
                     f"Kết luận nhân quả {pair[0]}→{pair[1]} THAY ĐỔI "
-                    f"khi loại tuần nội suy: "
+                    f"khi loại tuần forward-fill: "
                     f"{'có' if full_sig else 'không'} → "
                     f"{'có' if clean_sig else 'không'} ý nghĩa."
                 )
@@ -412,7 +412,7 @@ def _run_sensitivity_analysis(df, d_values, max_lag, full_results):
         logger.info("Sensitivity: kết luận Granger KHÔNG thay đổi — robust.")
 
     return {
-        "description": "So sánh Granger giữa dataset đầy đủ và dataset loại tuần nội suy.",
+        "description": "So sánh Granger giữa dataset đầy đủ và dataset loại tuần forward-fill.",
         "n_observations_clean": n_clean,
         "n_after_diff": len(df_clean_diff),
         "clean_results": clean_results,

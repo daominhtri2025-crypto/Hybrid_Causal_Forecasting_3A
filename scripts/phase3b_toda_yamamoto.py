@@ -67,7 +67,7 @@ logger = get_logger("phase3b")
 
 SIGNIFICANCE_LEVEL = 0.05
 
-ANALYSIS_VARS = ["OEE_Score", "DelayRate", "Revenue", "OrderVolume"]
+ANALYSIS_VARS = ["ProductionVolume", "DelayRate", "OrderDemand"]
 
 # Số quan sát tối thiểu cho Toda-Yamamoto
 # Cần đủ bậc tự do cho VAR(k + d_max) → T phải >> k + d_max + 1
@@ -383,8 +383,8 @@ def _cross_check_with_granger(ty_results, granger_results):
 # =====================================================================
 
 def _run_sensitivity_analysis(df, k, d_max, var_names, full_results):
-    """Loại tuần nội suy, chạy lại Toda-Yamamoto, so sánh."""
-    interp_cols = [c for c in df.columns if c.startswith("is_interpolated")]
+    """Loại tuần forward-fill, chạy lại Toda-Yamamoto, so sánh."""
+    interp_cols = [c for c in df.columns if c.startswith("is_filled")]
     if not interp_cols:
         return None
 
@@ -393,14 +393,14 @@ def _run_sensitivity_analysis(df, k, d_max, var_names, full_results):
 
     if n_excluded == 0:
         return {
-            "description": "Không có tuần nội suy — kết quả giống hoàn toàn.",
+            "description": "Không có tuần forward-fill — kết quả giống hoàn toàn.",
             "discrepancies": []
         }
 
     df_clean = df.loc[~any_interpolated].copy()
 
     logger.info(
-        f"\n--- SENSITIVITY: loại {n_excluded} tuần nội suy, "
+        f"\n--- SENSITIVITY: loại {n_excluded} tuần forward-fill, "
         f"còn {len(df_clean)} tuần ---"
     )
 
@@ -443,7 +443,7 @@ def _run_sensitivity_analysis(df, k, d_max, var_names, full_results):
                 "clean_significant": clean_sig,
                 "warning": (
                     f"Toda-Yamamoto {pair[0]}→{pair[1]} thay đổi kết luận "
-                    f"khi loại tuần nội suy."
+                    f"khi loại tuần forward-fill."
                 )
             })
             logger.warning(
@@ -454,7 +454,7 @@ def _run_sensitivity_analysis(df, k, d_max, var_names, full_results):
         logger.info("Sensitivity: kết luận Toda-Yamamoto KHÔNG thay đổi — robust.")
 
     return {
-        "description": "So sánh Toda-Yamamoto giữa dataset đầy đủ và loại tuần nội suy.",
+        "description": "So sánh Toda-Yamamoto giữa dataset đầy đủ và loại tuần forward-fill.",
         "n_observations_clean": len(df_clean),
         "clean_results": clean_results,
         "discrepancies": discrepancies

@@ -3,11 +3,11 @@ Tầng 3 — Phase 1: Kiểm định tính dừng (Stationarity Testing).
 
 Mục đích:
     Xác định bậc tích hợp d(i) riêng cho TỪNG biến trong hệ thống nhân quả
-    bằng phương pháp kiểm định kép ADF + KPSS (dual confirmation strategy,
-    theo Pfaff 2008, "Analysis of Integrated and Cointegrated Time Series
-    with R"). Kết quả d(i) là INPUT BẮT BUỘC cho Phase 2 (Granger — cần
-    sai phân đúng bậc), Phase 3 (Johansen — yêu cầu I(1)), và Phase 3b
-    (Toda-Yamamoto — cần d_max).
+    (ProductionVolume, DelayRate, OrderDemand) bằng phương pháp kiểm định kép
+    ADF + KPSS (dual confirmation strategy, theo Pfaff 2008, "Analysis of
+    Integrated and Cointegrated Time Series with R"). Kết quả d(i) là INPUT
+    BẮT BUỘC cho Phase 2 (Granger — cần sai phân đúng bậc), Phase 3
+    (Johansen — yêu cầu I(1)), và Phase 3b (Toda-Yamamoto — cần d_max).
 
     Phương pháp kiểm định kép (TẠI SAO dùng cả ADF lẫn KPSS):
       - ADF (Augmented Dickey-Fuller):
@@ -68,8 +68,9 @@ logger = get_logger("phase1")
 # ro Type I (bác bỏ nhầm H0) và Type II (giữ nhầm H0).
 SIGNIFICANCE_LEVEL = 0.05
 
-# Bốn biến phân tích trong hệ thống nhân quả — đúng theo output Phase 0
-ANALYSIS_VARS = ["OEE_Score", "DelayRate", "Revenue", "OrderVolume"]
+# Ba biến phân tích trong hệ thống nhân quả — đúng theo output Phase 0
+# (Phương án A: OrderDemand → ProductionVolume → DelayRate)
+ANALYSIS_VARS = ["ProductionVolume", "DelayRate", "OrderDemand"]
 
 # Số quan sát tối thiểu để kiểm định ADF/KPSS cho kết quả đáng tin cậy.
 # Với ít hơn 8 quan sát, power của kiểm định quá thấp để kết luận có ý
@@ -121,7 +122,7 @@ def _run_adf_test(series, var_name, diff_label="level"):
         và kết luận bác bỏ/giữ H0.
 
     Lý do dùng regression='c' (constant, không có trend):
-        Các biến trong pipeline này (OEE_Score, DelayRate, Revenue, OrderVolume)
+        Các biến trong pipeline này (ProductionVolume, DelayRate, OrderDemand)
         dao động quanh mức trung bình, không có xu hướng tuyến tính rõ ràng
         trong dữ liệu tuần ngắn hạn. Nếu có trend, ADF với 'c' sẽ thiên
         về kết luận "không dừng" — đây là hướng bảo thủ (an toàn hơn so với
@@ -478,35 +479,35 @@ def _find_integration_order(series, var_name):
 
 def _run_sensitivity_analysis(df, full_results):
     """
-    Phân tích độ nhạy: loại bỏ tuần có giá trị nội suy, chạy lại kiểm định.
+    Phân tích độ nhạy: loại bỏ tuần có giá trị forward-fill, chạy lại kiểm định.
 
     TẠI SAO cần phân tích độ nhạy:
         Nội suy (interpolation) ở Phase 0 tạo ra dữ liệu "nhân tạo" — các
         giá trị này KHÔNG phải quan sát thực mà được suy ra từ các tuần lân
-        cận. Nếu kết luận tính dừng thay đổi khi loại tuần nội suy, nghĩa
-        là kết luận PHỤTHUỘC vào bước nội suy → cần thận trọng khi diễn giải.
+        cận. Nếu kết luận tính dừng thay đổi khi loại tuần forward-fill, nghĩa
+        là kết luận PHỤTHUỘC vào bước forward-fill → cần thận trọng khi diễn giải.
 
     Quy trình:
-        1. Xác định tuần có BẤT KỲ cột is_interpolated nào = True.
+        1. Xác định tuần có BẤT KỲ cột is_filled nào = True.
         2. Loại các tuần đó → tạo dataset "sạch".
         3. Chạy lại _find_integration_order trên dataset sạch.
         4. So sánh d(i) giữa 2 lần chạy → ghi WARNING nếu khác.
     """
-    # Xác định tuần nội suy (bất kỳ biến nào bị nội suy)
-    interp_cols = [c for c in df.columns if c.startswith("is_interpolated")]
+    # Xác định tuần forward-fill (bất kỳ biến nào bị forward-fill)
+    interp_cols = [c for c in df.columns if c.startswith("is_filled")]
     if not interp_cols:
-        logger.info("Không tìm thấy cột is_interpolated — bỏ qua sensitivity analysis.")
+        logger.info("Không tìm thấy cột is_filled — bỏ qua sensitivity analysis.")
         return None
 
-    # Tạo mask: True nếu tuần đó có BẤT KỲ giá trị nào bị nội suy
+    # Tạo mask: True nếu tuần đó có BẤT KỲ giá trị nào bị forward-fill
     any_interpolated = df[interp_cols].any(axis=1)
     excluded_weeks = df.loc[any_interpolated, "week_start"].tolist()
     n_excluded = int(any_interpolated.sum())
 
     if n_excluded == 0:
-        logger.info("Không có tuần nào bị nội suy — sensitivity analysis không cần thiết.")
+        logger.info("Không có tuần nào bị forward-fill — sensitivity analysis không cần thiết.")
         return {
-            "description": "Không có tuần nội suy — kết quả giống hoàn toàn.",
+            "description": "Không có tuần forward-fill — kết quả giống hoàn toàn.",
             "excluded_weeks": [],
             "n_observations_clean": len(df),
             "discrepancies": []
@@ -516,14 +517,14 @@ def _run_sensitivity_analysis(df, full_results):
     n_clean = len(df_clean)
 
     logger.info(
-        f"Sensitivity analysis: loại {n_excluded} tuần nội suy "
+        f"Sensitivity analysis: loại {n_excluded} tuần forward-fill "
         f"({', '.join(str(w) for w in excluded_weeks)}), "
         f"còn {n_clean} tuần 'sạch'."
     )
 
     if n_clean < MIN_OBS_STATIONARITY:
         logger.warning(
-            f"Sensitivity analysis: chỉ còn {n_clean} tuần sau khi loại nội suy "
+            f"Sensitivity analysis: chỉ còn {n_clean} tuần sau khi loại forward-fill "
             f"(< {MIN_OBS_STATIONARITY} tối thiểu). Kết quả sensitivity có "
             f"ĐỘ TIN CẬY RẤT THẤP — chỉ mang tính tham khảo."
         )
@@ -551,14 +552,14 @@ def _run_sensitivity_analysis(df, full_results):
                 "d_clean_dataset": clean_d,
                 "warning": (
                     f"Bậc tích hợp d({var}) thay đổi từ {full_d} (đầy đủ) "
-                    f"sang {clean_d} (loại nội suy). Kết luận tính dừng CÓ "
-                    f"THỂ PHỤ THUỘC vào bước nội suy ở Phase 0."
+                    f"sang {clean_d} (loại forward-fill). Kết luận tính dừng CÓ "
+                    f"THỂ PHỤ THUỘC vào bước forward-fill ở Phase 0."
                 )
             }
             discrepancies.append(discrepancy)
             logger.warning(
                 f"⚠ SENSITIVITY: d({var}) thay đổi {full_d} → {clean_d} "
-                f"khi loại tuần nội suy!"
+                f"khi loại tuần forward-fill!"
             )
 
     if not discrepancies:
@@ -568,7 +569,7 @@ def _run_sensitivity_analysis(df, full_results):
         )
 
     return {
-        "description": "So sánh kiểm định tính dừng giữa dataset đầy đủ và dataset loại tuần nội suy.",
+        "description": "So sánh kiểm định tính dừng giữa dataset đầy đủ và dataset loại tuần forward-fill.",
         "excluded_weeks": [str(w) for w in excluded_weeks],
         "n_excluded": n_excluded,
         "n_observations_clean": n_clean,
@@ -693,7 +694,7 @@ def run_phase1(input_path=None):
     # Bước 3: Kiểm định tính dừng cho từng biến
     # -----------------------------------------------------------------
     logger.info("-" * 40)
-    logger.info("Bắt đầu kiểm định tính dừng cho 4 biến...")
+    logger.info("Bắt đầu kiểm định tính dừng cho 3 biến...")
     logger.info("-" * 40)
 
     var_results = {}
@@ -743,7 +744,7 @@ def run_phase1(input_path=None):
     logger.info("-" * 40)
 
     # -----------------------------------------------------------------
-    # Bước 5: Phân tích độ nhạy (loại tuần nội suy)
+    # Bước 5: Phân tích độ nhạy (loại tuần forward-fill)
     # -----------------------------------------------------------------
     logger.info("\n--- PHÂN TÍCH ĐỘ NHẠY (Sensitivity Analysis) ---")
     sensitivity = _run_sensitivity_analysis(df, var_results)

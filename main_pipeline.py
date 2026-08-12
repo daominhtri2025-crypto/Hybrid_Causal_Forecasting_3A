@@ -6,14 +6,11 @@ Mục đích:
     từ dữ liệu thô đến trực quan hóa IRF/FEVD, trong MỘT lần chạy duy nhất.
 
 Cách dùng:
-    # Chế độ 1: DEMO — Phase 0 tự sinh toàn bộ dữ liệu giả lập
+    # Chế độ mặc định: Phase 0 tái cấu trúc dữ liệu thật từ Tầng 1
     python main_pipeline.py
 
-    # Chế độ 2: HYBRID — Delay thật từ Tầng 1 + OEE/Revenue giả lập
-    python main_pipeline.py --delay-csv "data/raw/snapshot_.../cmt_delay_results.csv"
-
-    # Chế độ 3: DỮ LIỆU THẬT — bỏ qua Phase 0, nạp thẳng dataset hoàn chỉnh
-    python main_pipeline.py --data "path/to/real_data.xlsx"
+    # Chế độ DỮ LIỆU THẬT — bỏ qua Phase 0, nạp thẳng dataset hoàn chỉnh
+    python main_pipeline.py --data "path/to/real_data.csv"
 
     # Chỉ chạy đến Phase 3 (debug / kiểm tra trung gian)
     python main_pipeline.py --stop-after phase3
@@ -22,17 +19,13 @@ Cách dùng:
     python main_pipeline.py --resume-from phase3
 
 Input:
-    --delay-csv  : (tùy chọn) Đường dẫn CSV chứa Sales Order thật từ Tầng 1.
-                   Phase 0 dùng Delay thật + tạo OEE/Revenue giả lập có tương quan.
     --data       : (tùy chọn) Đường dẫn file CSV/Excel chứa dataset hoàn chỉnh.
-                   Yêu cầu: cột Date, OEE_Score, DelayRate, Revenue, OrderVolume.
+                   Yêu cầu: cột week_start, ProductionVolume, DelayRate, OrderDemand.
                    Bỏ qua Phase 0 hoàn toàn.
     --stop-after : (tùy chọn) Dừng pipeline sau Phase chỉ định.
     --resume-from: (tùy chọn) Tiếp tục từ Phase chỉ định, bỏ qua các Phase
                    trước nếu output đã tồn tại từ lần chạy trước.
-    --seed       : (tùy chọn) Random seed cho Phase 0 (mặc định: 42).
-
-    Lưu ý: --data và --delay-csv loại trừ nhau. Không truyền cả hai.
+    --seed       : (tùy chọn) Random seed (mặc định: 42).
 
 Output:
     data/processed/causal_weekly_dataset.csv   — Dataset tuần chuẩn hóa
@@ -71,7 +64,7 @@ from utils import get_logger  # noqa: E402 — phải sau sys.path
 # ---------------------------------------------------------------------------
 # Hằng số pipeline
 # ---------------------------------------------------------------------------
-REQUIRED_COLUMNS = ["Date", "OEE_Score", "DelayRate", "Revenue", "OrderVolume"]
+REQUIRED_COLUMNS = ["week_start", "ProductionVolume", "DelayRate", "OrderDemand"]
 
 OUTPUT_DIRS = [
     BASE_DIR / "data" / "processed",
@@ -84,7 +77,7 @@ OUTPUT_DIRS = [
 
 # Thứ tự Phase — mỗi tuple: (tên hiển thị, tên module, hàm chạy)
 PHASE_REGISTRY = [
-    ("Phase 0", "Tạo dữ liệu giả lập (Synthetic Pipeline)"),
+    ("Phase 0", "Tái cấu trúc dữ liệu (Data Reengineering)"),
     ("Phase 1", "Kiểm định tính dừng (ADF + KPSS)"),
     ("Phase 2", "Kiểm định nhân quả Granger"),
     ("Phase 3", "Kiểm định đồng liên kết Johansen"),
@@ -118,7 +111,7 @@ def _load_external_data(data_path: str, logger) -> str:
 
     Quy trình:
         1. Phát hiện định dạng qua phần mở rộng (.csv / .xlsx / .xls).
-        2. Kiểm tra đủ 5 cột bắt buộc (Date, OEE_Score, ...).
+        2. Kiểm tra đủ 4 cột bắt buộc (week_start, ProductionVolume, ...).
         3. Parse cột Date thành datetime, sắp xếp theo thời gian.
         4. Ghi ra data/processed/causal_weekly_dataset.csv (UTF-8).
     """
@@ -147,17 +140,17 @@ def _load_external_data(data_path: str, logger) -> str:
             f"Cần đủ: {REQUIRED_COLUMNS}"
         )
 
-    # --- Chuẩn hóa Date và sắp xếp ---
-    df["Date"] = pd.to_datetime(df["Date"])
-    df = df.sort_values("Date").reset_index(drop=True)
+    # --- Chuẩn hóa week_start và sắp xếp ---
+    df["week_start"] = pd.to_datetime(df["week_start"])
+    df = df.sort_values("week_start").reset_index(drop=True)
 
     n_rows = len(df)
-    date_min = df["Date"].min().strftime("%Y-%m-%d")
-    date_max = df["Date"].max().strftime("%Y-%m-%d")
+    date_min = df["week_start"].min().strftime("%Y-%m-%d")
+    date_max = df["week_start"].max().strftime("%Y-%m-%d")
     logger.info(f"Dữ liệu thật: {n_rows} quan sát, từ {date_min} đến {date_max}")
 
     # Kiểm tra NaN trong các cột số
-    numeric_cols = [c for c in REQUIRED_COLUMNS if c != "Date"]
+    numeric_cols = [c for c in REQUIRED_COLUMNS if c != "week_start"]
     nan_counts = df[numeric_cols].isna().sum()
     total_nan = nan_counts.sum()
     if total_nan > 0:
@@ -330,30 +323,25 @@ def log_phase_transition(phase_from: str, phase_to: str, status: str,
 
 def _run_phase0(data_path: str, delay_csv: str, seed: int, logger) -> str:
     """
-    Phase 0: Tạo dữ liệu — 3 chế độ tuỳ tham số đầu vào.
+    Phase 0: Tái cấu trúc dữ liệu — 2 chế độ tuỳ tham số đầu vào.
 
-    Chế độ 1 (DEMO):   Không có --data, không có --delay-csv
-        → Phase 0 sinh toàn bộ 4 biến giả lập.
-    Chế độ 2 (HYBRID): Có --delay-csv
-        → Phase 0 dùng Delay thật + tạo OEE/Revenue giả lập có tương quan.
-    Chế độ 3 (THẬT):   Có --data
+    Chế độ 1 (MẶC ĐỊNH): Không có --data
+        → Phase 0 tái cấu trúc dữ liệu thật từ Tầng 1 (production_volume,
+          cmt_delay_results, order_demand) → causal_weekly_dataset.csv.
+    Chế độ 2 (NẠP THẲNG): Có --data
         → Bỏ qua Phase 0, nạp thẳng dataset hoàn chỉnh.
 
     Trả về: đường dẫn tới causal_weekly_dataset.csv.
     """
     if data_path:
-        logger.info("[PHASE 0] Chế độ DỮ LIỆU THẬT — bỏ qua synthetic pipeline")
+        logger.info("[PHASE 0] Chế độ DỮ LIỆU THẬT — nạp thẳng dataset")
         csv_path = _load_external_data(data_path, logger)
         return csv_path
 
-    from phase0_synthetic_pipeline import run_phase0_synthetic
+    from phase0_data_reengineering import run_phase0
 
-    if delay_csv:
-        logger.info(f"[PHASE 0] Chế độ HYBRID — Delay thật từ: {delay_csv}")
-        csv_path = run_phase0_synthetic(delay_csv=delay_csv, seed=seed)
-    else:
-        logger.info("[PHASE 0] Chế độ DEMO — kích hoạt full synthetic pipeline")
-        csv_path = run_phase0_synthetic(seed=seed)
+    logger.info("[PHASE 0] Tái cấu trúc dữ liệu thật từ Tầng 1")
+    csv_path = run_phase0()
 
     return csv_path
 
@@ -428,8 +416,8 @@ def run_pipeline(
 
     Tham số:
         data_path:   đường dẫn dataset hoàn chỉnh (.csv/.xlsx). Bỏ qua Phase 0.
-        delay_csv:   đường dẫn CSV Sales Order thật → Phase 0 hybrid mode.
-        seed:        random seed cho Phase 0 (mặc định: 42).
+        delay_csv:   (không dùng — giữ lại cho tương thích API).
+        seed:        random seed (mặc định: 42).
         stop_after:  dừng sau Phase chỉ định ('phase0'..'phase5'). None = chạy hết.
         resume_from: tiếp tục từ Phase chỉ định, bỏ qua các Phase trước nếu
                      output đã tồn tại. Hữu ích khi debug Phase cuối mà không
@@ -446,11 +434,9 @@ def run_pipeline(
     resume_idx = STOP_POINTS.get(resume_from, 0) if resume_from else 0
 
     if data_path:
-        mode = "DỮ LIỆU THẬT (bỏ qua Phase 0)"
-    elif delay_csv:
-        mode = "HYBRID (Delay thật + OEE/Revenue giả lập)"
+        mode = "DỮ LIỆU THẬT (nạp thẳng — bỏ qua Phase 0)"
     else:
-        mode = "DEMO (Full Synthetic)"
+        mode = "DỮ LIỆU THẬT (Tái cấu trúc từ Tầng 1)"
     logger.info(f"  Chế độ chạy : {mode}")
     logger.info(f"  Random seed : {seed}")
     if stop_after:
@@ -571,12 +557,11 @@ def _build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Ví dụ:\n"
-            "  python main_pipeline.py                                              # Demo (full synthetic)\n"
-            "  python main_pipeline.py --delay-csv data/raw/snapshot_.../cmt_delay_results.csv  # Hybrid\n"
-            "  python main_pipeline.py --data real_data.xlsx                        # Dữ liệu thật hoàn chỉnh\n"
-            "  python main_pipeline.py --stop-after phase3                         # Chỉ chạy đến Phase 3\n"
-            "  python main_pipeline.py --resume-from phase3                        # Tiếp tục từ Phase 3\n"
-            "  python main_pipeline.py --resume-from phase4 --stop-after phase4    # Chỉ chạy Phase 4\n"
+            "  python main_pipeline.py                                              # Dữ liệu thật từ Tầng 1\n"
+            "  python main_pipeline.py --data real_data.csv                         # Nạp thẳng dataset\n"
+            "  python main_pipeline.py --stop-after phase3                          # Chỉ chạy đến Phase 3\n"
+            "  python main_pipeline.py --resume-from phase3                         # Tiếp tục từ Phase 3\n"
+            "  python main_pipeline.py --resume-from phase4 --stop-after phase4     # Chỉ chạy Phase 4\n"
         ),
     )
 
@@ -586,9 +571,8 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="PATH",
         help=(
-            "Chế độ HYBRID: Đường dẫn CSV Sales Order thật từ Tầng 1 "
-            "(cmt_delay_results.csv). Phase 0 dùng Delay thật + tạo "
-            "OEE/Revenue giả lập có tương quan. Loại trừ với --data."
+            "(Không dùng trong Phương án A) Giữ lại cho tương thích API. "
+            "Loại trừ với --data."
         ),
     )
 
@@ -598,9 +582,9 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="PATH",
         help=(
-            "Chế độ DỮ LIỆU THẬT: Đường dẫn file CSV/Excel chứa dataset "
-            "hoàn chỉnh (cần cột Date, OEE_Score, DelayRate, Revenue, "
-            "OrderVolume). Bỏ qua Phase 0. Loại trừ với --delay-csv."
+            "Chế độ NẠP THẲNG: Đường dẫn file CSV/Excel chứa dataset "
+            "hoàn chỉnh (cần cột week_start, ProductionVolume, DelayRate, "
+            "OrderDemand). Bỏ qua Phase 0."
         ),
     )
 

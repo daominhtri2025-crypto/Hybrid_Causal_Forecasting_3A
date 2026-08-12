@@ -25,9 +25,10 @@ Cơ sở toán học — VECM (Vector Error Correction Model):
       β'·y_t ≈ 0. Khi hệ thống lệch khỏi cân bằng → ECT ≠ 0 → tín hiệu
       kích hoạt cơ chế tự điều chỉnh.
 
-      Ví dụ: nếu OEE tăng bất thường (lệch cân bằng), ECT > 0, hệ thống
-      sẽ điều chỉnh OEE giảm lại hoặc các biến khác tăng lên để khôi phục
-      trạng thái cân bằng — TỐC ĐỘ điều chỉnh do ma trận α quyết định.
+      Ví dụ: nếu ProductionVolume tăng bất thường (lệch cân bằng), ECT > 0,
+      hệ thống sẽ điều chỉnh ProductionVolume giảm lại hoặc các biến khác
+      tăng lên để khôi phục trạng thái cân bằng — TỐC ĐỘ điều chỉnh do
+      ma trận α quyết định.
 
   (2) QUAN HỆ NGẮN HẠN — Short-run Dynamics:
       ──────────────────────────────────────────
@@ -98,7 +99,7 @@ CONFIDENCE_LEVEL = 0.95    # khoảng tin cậy 95%
 Z_SCORE_95 = 1.96          # z-score hai phía cho phân phối chuẩn
 
 # Thứ tự biến CỐ ĐỊNH — khớp với Tầng 3 (Phase 1–3b)
-ANALYSIS_VARIABLES = ["OEE_Score", "DelayRate", "Revenue", "OrderVolume"]
+ANALYSIS_VARIABLES = ["ProductionVolume", "DelayRate", "OrderDemand"]
 
 # Seed cho reproducibility (CLAUDE.md mục 3.5)
 np.random.seed(42)
@@ -459,12 +460,12 @@ def _run_var_on_levels(endog, df, n_obs, n_vars, lag_order,
     for v_idx, var in enumerate(ANALYSIS_VARIABLES):
         for h_idx in range(FORECAST_HORIZON):
             fc = float(fc_point[h_idx, v_idx])
-            if var in ("OEE_Score", "DelayRate") and (fc < 0 or fc > 1):
+            if var == "DelayRate" and (fc < 0 or fc > 1):
                 output_json["warnings"].append(
                     f"{var} T+{h_idx + 1} = {fc:.4f}: ngoài [0, 1]. "
                     f"VAR không ràng buộc biên — cần diễn giải cẩn thận."
                 )
-            if var in ("Revenue", "OrderVolume") and fc < 0:
+            if var in ("ProductionVolume", "OrderDemand") and fc < 0:
                 output_json["warnings"].append(
                     f"{var} T+{h_idx + 1} = {fc:.4f}: âm (vô nghĩa kinh tế). "
                     f"Mô hình tuyến tính không ràng buộc phi âm."
@@ -562,7 +563,7 @@ def run_tang4(input_csv=None, phase3_json=None):
     # (N=10), đây là lựa chọn HỢP LÝ NHẤT:
     #   - k_ar_diff=0: 3 params/eq, ~9 eff obs, 6 DoF → ước lượng ổn định
     #   - k_ar_diff=1: 7 params/eq, ~8 eff obs, 1 DoF → OVERFITTING nghiêm
-    #     trọng, dự báo bùng nổ (đã kiểm chứng: OEE dự báo lên hàng triệu)
+    #     trọng, dự báo bùng nổ
     #
     # Kết luận: dùng k_ar_diff=0 từ Phase 3 JSON — đây KHÔNG phải "tự tìm
     # lại lag" mà là dùng ĐÚNG giá trị đã được Johansen test xác nhận.
@@ -635,7 +636,7 @@ def run_tang4(input_csv=None, phase3_json=None):
     # → Cho phép hằng số trong phương trình VECM (không chỉ trong β'y),
     #   tức E[Δy_t] có thể ≠ 0, tương đương giả định xu hướng tuyến tính
     #   trong mức gốc (levels) — phù hợp với dữ liệu sản xuất thực tế
-    #   (OEE, Revenue có thể tăng/giảm theo xu hướng).
+    #   (ProductionVolume, OrderDemand có thể tăng/giảm theo xu hướng).
 
     # Tính bậc tự do để cảnh báo trước khi fit:
     # VECM(k_ar_diff=1, r=2, n=4, const=1):
@@ -715,8 +716,9 @@ def run_tang4(input_csv=None, phase3_json=None):
     #   Mỗi CỘT j là 1 vector đồng tích hợp β_j.
     #   Quan hệ dài hạn: β_j' · y_t ≈ 0 khi hệ thống ở cân bằng.
     #   Ý nghĩa: β_j chỉ ra TỶ LỆ CÂN BẰNG giữa các biến. Nếu β hàng
-    #   OEE > 0 và β hàng DelayRate < 0, nghĩa là OEE cao đi kèm Delay thấp
-    #   trong dài hạn — một "luật" cân bằng nội tại của hệ thống sản xuất.
+    #   ProductionVolume > 0 và β hàng DelayRate < 0, nghĩa là sản lượng cao
+    #   đi kèm Delay thấp trong dài hạn — một "luật" cân bằng nội tại của
+    #   hệ thống sản xuất.
     #
     # α (alpha): ma trận loading/adjustment — shape (n_vars, coint_rank)
     #   α[i, j] = tốc độ biến thứ i điều chỉnh về cân bằng thứ j.
@@ -792,10 +794,10 @@ def run_tang4(input_csv=None, phase3_json=None):
     # Mỗi block Γ_i (n_vars × n_vars) mô tả tác động của Δy_{t-i} lên Δy_t.
     #
     # TẠI SAO short-run dynamics quan trọng?
-    # → Γ nắm bắt QUÁN TÍNH ngắn hạn: ví dụ nếu Γ[OEE, DelayRate] < 0,
-    #   nghĩa là tăng Delay tuần trước → OEE tuần này giảm (tác động trễ 1 tuần).
-    #   Đây là thông tin KHÁC với quan hệ dài hạn (β) — một biến có thể
-    #   không liên quan dài hạn nhưng tác động ngắn hạn mạnh.
+    # → Γ nắm bắt QUÁN TÍNH ngắn hạn: ví dụ nếu Γ[ProductionVolume, DelayRate] < 0,
+    #   nghĩa là tăng Delay tuần trước → ProductionVolume tuần này giảm (tác động
+    #   trễ 1 tuần). Đây là thông tin KHÁC với quan hệ dài hạn (β) — một biến có
+    #   thể không liên quan dài hạn nhưng tác động ngắn hạn mạnh.
 
     gamma_info = {}
     if actual_k_ar_diff > 0:
@@ -1025,12 +1027,12 @@ def run_tang4(input_csv=None, phase3_json=None):
     for v_idx, var in enumerate(ANALYSIS_VARIABLES):
         for h_idx in range(FORECAST_HORIZON):
             fc = float(forecast[h_idx, v_idx])
-            if var in ("OEE_Score", "DelayRate") and (fc < 0 or fc > 1):
+            if var == "DelayRate" and (fc < 0 or fc > 1):
                 output["warnings"].append(
                     f"{var} T+{h_idx + 1} = {fc:.4f}: ngoài [0, 1]. "
                     f"VECM không ràng buộc biên — cần diễn giải cẩn thận."
                 )
-            if var in ("Revenue", "OrderVolume") and fc < 0:
+            if var in ("ProductionVolume", "OrderDemand") and fc < 0:
                 output["warnings"].append(
                     f"{var} T+{h_idx + 1} = {fc:.4f}: âm (vô nghĩa kinh tế). "
                     f"Mô hình tuyến tính không ràng buộc phi âm."

@@ -2,51 +2,45 @@
 Tầng 1 — DB Layer: Khai thác dữ liệu gốc từ SQL Server.
 
 Mục đích:
-    Kết nối trực tiếp vào database ERP (QTDN) trên SQL Server, trích xuất và
-    TÍNH TOÁN 3 bảng phân tích (`cmt_oee_results`, `cmt_delay_results`,
-    `fob_revenue`) từ các bảng Microsoft Dynamics NAV. Cả 3 truy vấn dùng
-    chung mốc thời gian `snapshot_time` để đảm bảo tính nhất quán dữ liệu.
+    Kết nối trực tiếp vào database ERP (QTDN) trên SQL Server, trích xuất
+    3 bảng phân tích (`production_volume`, `cmt_delay_results`, `order_demand`)
+    từ các bảng Microsoft Dynamics NAV. Cả 3 truy vấn dùng chung mốc thời
+    gian `snapshot_time` để đảm bảo tính nhất quán dữ liệu.
 
 Thiết kế (theo ARCHITECTURE_4_tang.md, Tầng 1):
     1. Mở 1 kết nối SQL Server duy nhất, chốt `snapshot_time` MỘT LẦN.
-    2. Chạy 3 truy vấn SQL tính toán OEE_Score, IsDelayed, Revenue — mỗi
-       truy vấn lọc theo `WHERE <cột thời gian> <= @snapshot_time`.
+    2. Chạy 3 truy vấn SQL — mỗi truy vấn lọc theo `WHERE ... <= @snapshot_time`.
     3. Ghi NGUYÊN TRẠNG kết quả ra `data/raw/snapshot_YYYYMMDD_HHMM/*.csv`
-       — KHÔNG transform thêm sau khi đã truy vấn (tuân thủ nguyên tắc bất
-       biến, CLAUDE.md mục 2).
+       — KHÔNG transform thêm (tuân thủ CLAUDE.md mục 2).
     4. Tự động cập nhật `data/raw/MANIFEST.md`: timestamp, checksum SHA-256,
-       số dòng mỗi file, tỉ lệ khớp OrderNo giữa 3 file.
+       số dòng mỗi file, tỉ lệ khớp OrderNo giữa các file.
 
 Input:  SQL Server (QTDN) — ĐÂY LÀ ĐIỂM TRUY CẬP SQL SERVER DUY NHẤT
         của toàn bộ Phương án 3 (CLAUDE.md mục 4).
-Output: `data/raw/snapshot_YYYYMMDD_HHMM/{cmt_oee_results.csv,
-        cmt_delay_results.csv, fob_revenue.csv}` + `data/raw/MANIFEST.md`.
+Output: `data/raw/snapshot_YYYYMMDD_HHMM/{production_volume.csv,
+        cmt_delay_results.csv, order_demand.csv}` + `data/raw/MANIFEST.md`.
 Sở hữu: Role A — Data Engineering (skill.md).
 
 Bảng NAV (Dynamics NAV / Business Central) sử dụng:
-    - [Production Order Header]: lệnh sản xuất (No_, Starting Date, Ending Date,
-      Source No_, Status). Lưu ý: CSDL còn có [Production Order Header Posted]
-      cho LSX đã đăng (posted) — KPI hiện tại dùng bảng Posted; ta dùng Header
-      để bao gồm cả LSX đang xử lý (Status=Released/Finished chưa post).
-    - [Production Order Line]: chi tiết lệnh SX (Quantity, Finished Quantity,
-      Scrap %) — JOIN với Header qua [Prod_ Order No_] = Header.[No_]
-    - [Production Order Routing Finished]: thời gian vận hành máy (Run Time,
-      Setup Time, Move Time) — dùng bởi KPI OEE thời gian; ta dùng Line
-      cho OEE số lượng (P×Q).
-    - [Sales Order Header]: đơn hàng bán (Shipment Date, Requested Delivery Date)
-    - [Cust_ Ledger Entry]: sổ cái khách hàng — cột [Sales (LCY)] chứa doanh
-      thu bằng VND. Đây là bảng CSDL thật sự sử dụng cho tính doanh thu
-      (xác nhận qua các hàm KPI trong QTDN.sql: KPI_0_91, KPI_0_93, KPI_2_51).
+    - [Value Entry] (Table 5802): bảng chủ lực — 363K+ dòng (2019–2026).
+      Source Type 3 (Work Center) và 4 (Machine Center) chứa sản lượng sản
+      xuất thực tế. Cột [Sales Order No_] liên kết về Sales Order (mã BDH).
+    - [Sales Order Header] (Table 36): đơn hàng bán — 8,580 dòng (2017–2027).
+      Cột [Shipment Date]/[Requested Delivery Date] cho phân tích delay.
+    - [Sales Order Line] (Table 37): chi tiết đơn hàng — cột [Quantity] chứa
+      khối lượng đặt hàng, dùng để tính biến OrderDemand.
 
-Thay đổi so với bản trước:
-    - v1: SELECT * FROM cmt_oee_results (bảng không tồn tại trong CSDL)
-    - v2: SELECT FROM WorkOrders/SalesOrders/Invoices (tên placeholder sai)
-    - v3: Truy vấn [Import and Export Revenue Line] — bảng tồn tại nhưng
-      KHÔNG ĐƯỢC SỬ DỤNG bởi bất kỳ hàm KPI nào trong CSDL (rủi ro dữ liệu
-      không đầy đủ hoặc không phản ánh doanh thu thực).
-    - v4 (bản này): Revenue chuyển sang [Cust_ Ledger Entry].[Sales (LCY)]
-      — đúng bảng mà toàn bộ hàm KPI QTDN đang sử dụng. OEE và Delay giữ
-      nguyên bảng NAV chuẩn (đã xác nhận qua Object Explorer).
+Lịch sử thay đổi:
+    - v1–v3: Truy vấn từ các bảng không đủ dữ liệu (xem git history).
+    - v4: Revenue từ [Cust_ Ledger Entry], OEE từ [Production Order Header].
+    - v5 (bản này, Phương án A): Chẩn đoán CSDL (2026-08-12) phát hiện:
+        * [Production Order Header]: chỉ 2 bản ghi (2010)
+        * [Cust_ Ledger Entry]: 3 bản ghi Revenue ≠ 0 (2010)
+        * [Sales Invoice Header]: rỗng hoàn toàn
+      → Chuyển sang Phương án A (100% dữ liệu thật):
+        * ProductionVolume từ [Value Entry] (Source Type 3+4)
+        * DelayRate từ [Sales Order Header] (giữ nguyên)
+        * OrderDemand từ [Sales Order Line] × [Sales Order Header]
 """
 
 import os
@@ -232,7 +226,7 @@ def _write_manifest(
         f"",
         f"- **Thời điểm trích xuất (snapshot_time):** {snapshot_time.isoformat()}",
         f"- **Thời điểm ghi file:** {datetime.now().isoformat()}",
-        f"- **Nguồn:** Truy vấn trực tiếp từ bảng NAV (Production Order Header/Line, Sales Order Header, Cust_ Ledger Entry)",
+        f"- **Nguồn:** Truy vấn trực tiếp từ bảng NAV (Value Entry, Sales Order Header/Line)",
         f"",
         f"### Danh sách file",
         f"",
@@ -282,13 +276,12 @@ def _write_manifest(
 
 
 # =====================================================================
-# CÁC TRUY VẤN SQL — TÍNH TOÁN TỪ BẢNG DYNAMICS NAV THẬT
+# CÁC TRUY VẤN SQL — PHƯƠNG ÁN A (100% DỮ LIỆU THẬT)
 # =====================================================================
-# Xác nhận nguồn dữ liệu qua 2 bằng chứng:
-#   1. Object Explorer + SELECT TOP 3 * (ngày 2026-08-10) — xác nhận bảng
-#      và cột tồn tại trong CSDL QTDN trên (local)\SQLEXPRESS.
-#   2. File QTDN.sql (cấu trúc CSDL) — đối chiếu bảng nào THỰC SỰ được
-#      sử dụng bởi các hàm KPI hiện có (KPI_0_91, KPI_2_51, KPI_2_64...).
+# Xác nhận nguồn dữ liệu qua chẩn đoán CSDL ngày 2026-08-12:
+#   1. [Value Entry]: 363,509 dòng (2019–2026), Source Type 3+4 = sản xuất
+#   2. [Sales Order Header]: 8,580 dòng (2017–2027), 4,092 có cả 2 ngày
+#   3. [Sales Order Line]: có Quantity > 0, liên kết với Header qua Document No_
 #
 # Bảng NAV có dấu cách trong tên → bọc bằng [dấu ngoặc vuông].
 # Cột NAV có hậu tố _ (vd: No_, Prod_ Order No_) → giữ nguyên.
@@ -297,76 +290,49 @@ def _write_manifest(
 # cột bằng: SELECT TOP 1 * FROM [tên bảng]; rồi sửa lại ở đây.
 # =====================================================================
 
-# --- Truy vấn 1: OEE (Overall Equipment Effectiveness) ---
-# Nguồn: [Production Order Header] JOIN [Production Order Line]
-#   - Header: chứa No_ (mã LSX), Starting Date, Ending Date
-#   - Line: chứa Quantity (kế hoạch), Finished Quantity (thực tế), Scrap %
+# --- Truy vấn 1: Production Volume (Sản lượng sản xuất) ---
+# Nguồn: [Value Entry] (NAV Table 5802)
 #
-# Ghi chú đối chiếu QTDN.sql:
-#   Các hàm KPI CSDL (KPI_2_64, KPI_2_67) dùng [Production Order Header
-#   Posted] (LSX đã đăng/finalized) thay vì [Production Order Header].
-#   Ta chọn [Production Order Header] vì:
-#     1. Cần cột [Ending Date], [Starting Date] (Header Posted dùng
-#        [Posting Date] — khác ngữ nghĩa: ngày đăng ≠ ngày hoàn thành SX)
-#     2. Cần JOIN với [Production Order Line] để lấy Quantity/Finished
-#        Quantity/Scrap% — KPI CSDL dùng [Production Order Routing Finished]
-#        cho dữ liệu THỜI GIAN (Run Time, Setup Time), không phải SỐ LƯỢNG.
-#     3. Filter WHERE [Ending Date] IS NOT NULL đã loại bỏ LSX chưa xong.
-#   Nếu cần chỉ lấy LSX đã post, đổi sang [Production Order Header Posted]
-#   và điều chỉnh tên cột cho phù hợp.
+# Lý do chuyển từ [Production Order Header]:
+#   Chẩn đoán CSDL (2026-08-12) cho thấy [Production Order Header] chỉ có
+#   2 bản ghi (2010), [Production Order Header Posted] rỗng hoàn toàn.
+#   Trong khi [Value Entry] có 363,509 dòng từ 2019-02-11 đến 2026-07-03,
+#   với Source Type 3 (Work Center, 162K) và 4 (Machine Center, 200K) chứa
+#   toàn bộ dữ liệu sản xuất thực tế.
 #
-# Công thức OEE thực dụng cho dữ liệu NAV:
-#   Performance (P) = Finished Quantity / Quantity
-#   Quality (Q) = 1 - Scrap% / 100
-#   OEE_Score = P × Q
+# Cột chính:
+#   - [Posting Date]: ngày hạch toán — mốc thời gian gán vào tuần
+#   - [Source Type]: 3 = Work Center, 4 = Machine Center (hoạt động SX)
+#   - [Valued Quantity]: sản lượng thực tế (đơn vị sản phẩm)
+#   - [Invoiced Quantity]: sản lượng đã xuất hóa đơn
+#   - [Item No_]: mã sản phẩm
+#   - [Document No_]: mã chứng từ sản xuất
+#   - [Sales Order No_]: liên kết về Sales Order (mã BDH) — cho phép
+#     merge sản xuất ↔ đơn hàng bán nếu cần
 #
-# NULLIF(..., 0) tại mỗi phép chia — tránh division by zero.
-# Chỉ lấy LSX có Ending Date (đã hoàn thành) và <= snapshot_time.
-SQL_OEE = """
+# Filter: Source Type IN (3, 4) — chỉ lấy hoạt động sản xuất tại Work
+# Center và Machine Center. Loại trừ Source Type 0 (139 dòng, không rõ
+# nguồn gốc).
+SQL_PRODUCTION = """
     SELECT
-        poh.[No_]                       AS OrderNo,
-        pol.[Item No_]                  AS ProductCode,
-        pol.[Quantity]                   AS PlanQty,
-        pol.[Finished Quantity]          AS RealQty,
-        pol.[Remaining Quantity]         AS RemainingQty,
-        pol.[Scrap %]                   AS ScrapPct,
-        poh.[Starting Date]             AS ActualStartDate,
-        poh.[Ending Date]               AS ActualEndDate,
-        poh.[Description],
-        poh.[Source No_]                AS SourceNo,
-        poh.[External Document No_]     AS ExternalDocNo,
+        ve.[Document No_]               AS OrderNo,
+        ve.[Item No_]                   AS ProductCode,
+        ve.[Posting Date]               AS PostingDate,
+        ve.[Source Type]                AS SourceType,
+        ve.[Valued Quantity]            AS ValuedQty,
+        ve.[Invoiced Quantity]          AS InvoicedQty,
+        ve.[Cost per Unit]              AS CostPerUnit,
+        ve.[Cost per Unit (LCY)]        AS CostPerUnitLCY,
+        ve.[Cost Actual]                AS CostActual,
+        ve.[Cost Actual (LCY)]          AS CostActualLCY,
+        ve.[Sales Order No_]            AS SalesOrderNo,
+        ve.[Document Type]              AS DocumentType
 
-        -- Performance: tỉ lệ hoàn thành kế hoạch
-        ROUND(
-            CAST(pol.[Finished Quantity] AS FLOAT)
-            / NULLIF(pol.[Quantity], 0),
-            4
-        ) AS Performance,
-
-        -- Quality: tỉ lệ sản phẩm đạt (1 - phế phẩm)
-        ROUND(
-            1.0 - ISNULL(pol.[Scrap %], 0) / 100.0,
-            4
-        ) AS Quality,
-
-        -- OEE_Score = Performance × Quality
-        CASE
-            WHEN ISNULL(pol.[Quantity], 0) = 0 THEN NULL
-            ELSE ROUND(
-                (CAST(pol.[Finished Quantity] AS FLOAT)
-                    / NULLIF(pol.[Quantity], 0))
-                * (1.0 - ISNULL(pol.[Scrap %], 0) / 100.0),
-                4
-            )
-        END AS OEE_Score
-
-    FROM [Production Order Header] poh
-    INNER JOIN [Production Order Line] pol
-        ON poh.[No_] = pol.[Prod_ Order No_]
-        AND poh.[Status] = pol.[Status]
-    WHERE poh.[Ending Date] IS NOT NULL
-      AND poh.[Ending Date] <= ?
-    ORDER BY poh.[Ending Date], poh.[No_]
+    FROM [Value Entry] ve
+    WHERE ve.[Source Type] IN (3, 4)
+      AND ve.[Posting Date] IS NOT NULL
+      AND ve.[Posting Date] <= ?
+    ORDER BY ve.[Posting Date], ve.[Document No_]
 """
 
 # --- Truy vấn 2: Delay (Trễ đơn hàng) ---
@@ -414,51 +380,61 @@ SQL_DELAY = """
     ORDER BY soh.[Shipment Date], soh.[No_]
 """
 
-# --- Truy vấn 3: Revenue (Doanh thu) ---
-# Nguồn: [Cust_ Ledger Entry] (Sổ cái khách hàng — NAV Table ID 21)
+# --- Truy vấn 3: Order Demand (Khối lượng đặt hàng) ---
+# Nguồn: [Sales Order Line] JOIN [Sales Order Header]
 #
-# Đây là bảng mà toàn bộ hàm KPI trong CSDL QTDN thật sự sử dụng để
-# tính doanh thu (xác nhận qua QTDN.sql: KPI_0_91 dùng [Cust_ Ledger Entry],
-# KPI_2_51 dùng [Customer Ledger Entry] — cùng 1 bảng, khác tên gọi giữa
-# phiên bản NAV classic vs Business Central).
+# Lý do chuyển từ [Cust_ Ledger Entry]:
+#   Chẩn đoán CSDL (2026-08-12) cho thấy [Cust_ Ledger Entry] chỉ có 3
+#   bản ghi có Sales (LCY) ≠ 0 (toàn bộ từ 06/2010), [Sales Invoice Header]
+#   rỗng hoàn toàn (0 hóa đơn). Công ty không posting hóa đơn vào NAV.
+#
+#   Thay vào đó, [Sales Order Line] có dữ liệu phong phú (join từ 8,580
+#   Sales Order Header, phạm vi 2017–2027) với cột [Quantity] chứa khối
+#   lượng đặt hàng thực tế.
+#
+# Biến OrderDemand (tổng Quantity/tuần) phản ánh ÁP LỰC ĐƠN HÀNG — động
+# lực nhân quả đầu vào trong chuỗi: OrderDemand → ProductionVolume → DelayRate.
+# Khi áp lực đơn hàng tăng → sản xuất phải tăng công suất → rủi ro trễ
+# hạn tăng theo.
 #
 # Cột chính:
-#   - [Document No_]: mã chứng từ (số hóa đơn) — dùng làm OrderNo
-#   - [Customer No_]: mã khách hàng
-#   - [Sales (LCY)]: doanh thu bằng nội tệ (VND) — ĐÃ CÓ SẴN, không cần
-#     tính Qty × UnitPrice
-#   - [Posting Date]: ngày hạch toán — dùng để lọc theo snapshot_time
-#   - [Document Type]: loại chứng từ (2 = Invoice/Hóa đơn)
+#   - sol.[Document No_]: mã đơn hàng (BDH) — khớp với Sales Order Header
+#   - sol.[Quantity]: khối lượng đặt hàng (đơn vị: PCS hoặc theo sản phẩm)
+#   - sol.[Shipment Date]: ngày giao dự kiến — mốc thời gian gán vào tuần
+#   - sol.[No_]: mã sản phẩm (item code)
+#   - soh.[Sell-to Customer No_]: mã khách hàng
 #
-# Lưu ý lịch sử: Phiên bản trước dùng [Import and Export Revenue Line] —
-# bảng đó tồn tại trong CSDL nhưng KHÔNG ĐƯỢC THAM CHIẾU bởi bất kỳ hàm
-# KPI nào trong QTDN.sql, có thể chỉ chứa dữ liệu XNK riêng (không đầy
-# đủ cho tổng doanh thu). Chuyển sang [Cust_ Ledger Entry] để khớp với
-# cách CSDL thật sự tính doanh thu.
-#
-# Filter [Document Type] = 2 (Invoice) để chỉ lấy hóa đơn bán — loại trừ
-# Payment (1), Credit Memo (3), Finance Charge (4), Reminder (5), Refund (6).
-SQL_REVENUE = """
+# Dùng [Shipment Date] từ Sales Order Line (mỗi line có thể có ngày giao
+# riêng, chính xác hơn dùng ngày từ Header).
+SQL_ORDER_DEMAND = """
     SELECT
-        cle.[Document No_]              AS OrderNo,
-        cle.[Customer No_]              AS CustomerCode,
-        cle.[Description],
-        cle.[Sales (LCY)]               AS Revenue,
-        cle.[Posting Date]              AS PostingDate,
-        cle.[Source Code]               AS SourceCode
-    FROM [Cust_ Ledger Entry] cle
-    WHERE cle.[Document Type] = 2
-      AND cle.[Sales (LCY)] <> 0
-      AND cle.[Posting Date] IS NOT NULL
-      AND cle.[Posting Date] <= ?
-    ORDER BY cle.[Posting Date], cle.[Document No_]
+        sol.[Document No_]              AS OrderNo,
+        sol.[Line No_]                  AS LineNo,
+        soh.[Sell-to Customer No_]      AS CustomerCode,
+        sol.[No_]                       AS ProductCode,
+        sol.[Description],
+        sol.[Quantity]                   AS Quantity,
+        sol.[Outstanding Quantity]       AS OutstandingQty,
+        sol.[Shipment Date]             AS ShipmentDate,
+        sol.[Unit of Measure]           AS UnitOfMeasure
+
+    FROM [Sales Order Line] sol
+    INNER JOIN [Sales Order Header] soh
+        ON sol.[Document No_] = soh.[No_]
+        AND sol.[Document Type] = soh.[Document Type]
+    WHERE sol.[Shipment Date] IS NOT NULL
+      AND sol.[Quantity] > 0
+      AND sol.[Shipment Date] <= ?
+    ORDER BY sol.[Shipment Date], sol.[Document No_]
 """
 
 # Ánh xạ tên bảng đầu ra → truy vấn SQL tương ứng
+# Phương án A (2026-08-12): chuyển từ OEE/Revenue sang Production/OrderDemand
+# vì CSDL NAV không có đủ dữ liệu Production Order (2 dòng) và Revenue (0 hóa đơn).
 QUERIES = {
-    "cmt_oee_results": SQL_OEE,
+    "production_volume": SQL_PRODUCTION,
     "cmt_delay_results": SQL_DELAY,
-    "fob_revenue": SQL_REVENUE,
+    "order_demand": SQL_ORDER_DEMAND,
 }
 
 
@@ -555,9 +531,9 @@ def extract_snapshot() -> str:
             # có, vì NULL có thể do PlanQty = 0 (chia cho 0) hoặc dữ liệu
             # thiếu ở bảng gốc.
             computed_cols = {
-                "cmt_oee_results": "OEE_Score",
+                "production_volume": "ValuedQty",
                 "cmt_delay_results": "IsDelayed",
-                "fob_revenue": "Revenue",
+                "order_demand": "Quantity",
             }
             check_col = computed_cols.get(table_name)
             if check_col and check_col in df.columns:

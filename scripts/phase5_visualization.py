@@ -4,7 +4,7 @@ Phase 5 — Trực quan hóa Hàm phản ứng xung (IRF) và Phân rã phương
 Mục đích:
   Tạo 2 biểu đồ cốt lõi phục vụ Chương 4 (Kết quả thực nghiệm) luận án:
     (1) Impulse Response Function (IRF) — phản ứng của DelayRate khi có cú sốc
-        1 SD từ OEE_Score và OrderVolume (orthogonalized, Cholesky ordering).
+        1 SD từ ProductionVolume và OrderDemand (orthogonalized, Cholesky ordering).
     (2) Forecast Error Variance Decomposition (FEVD) — phân rã phương sai sai
         số dự báo của DelayRate theo đóng góp từ từng biến qua 12 tuần.
 
@@ -31,18 +31,16 @@ Cơ sở toán học:
         nó ảnh hưởng đồng thời lên TẤT CẢ biến phía sau, nhưng KHÔNG bị ảnh
         hưởng ngược lại ở cùng thời điểm (recursive causal assumption).
 
-        Ordering đề xuất (dựa trên kết quả α — half-life từ Khung VECM):
-          OrderVolume → OEE_Score → Revenue → DelayRate
+        Ordering đề xuất (dựa trên chuỗi nhân quả lý thuyết):
+          OrderDemand → ProductionVolume → DelayRate
 
         Lý do:
-          - OrderVolume: ngoại sinh nhất — khối lượng đơn hàng xác định bởi thị
+          - OrderDemand: ngoại sinh nhất — nhu cầu đặt hàng xác định bởi thị
             trường, hệ thống sản xuất không kiểm soát được.
-          - OEE_Score: near-weakly-exogenous (half-life ~86 tuần) — driver chậm
-            thay đổi, phản ánh năng lực sản xuất nền tảng.
-          - Revenue: phản ứng trung bình (half-life vừa phải) — kết quả tài
-            chính phụ thuộc cả volume lẫn hiệu suất.
-          - DelayRate: nội sinh nhất — fast responder (half-life ~0.7 tuần),
-            biến "hấp thụ" mọi cú sốc từ hệ thống.
+          - ProductionVolume: phản ứng theo cầu — sản lượng điều chỉnh theo
+            áp lực đơn hàng, nhưng không thay đổi tức thì.
+          - DelayRate: nội sinh nhất — fast responder, tỷ lệ giao hàng trễ
+            là kết quả cuối cùng của toàn bộ hệ thống sản xuất.
 
   (B) FEVD (Lütkepohl 2005, Mục 2.3.3):
   ──────────────────────────────────────
@@ -51,8 +49,8 @@ Cơ sở toán học:
       Đo tỷ lệ (%) phương sai sai số dự báo của biến i ở tầm h do shock
       cấu trúc j gây ra. Tổng FEVD(i, :, h) = 100% ∀ i, h.
 
-      Ý nghĩa: nếu OEE shock giải thích 6% variance của DelayRate, nghĩa là
-      thay đổi hiệu suất sản xuất có tác động nhân quả trực tiếp — không phải
+      Ý nghĩa: nếu ProductionVolume shock giải thích 6% variance của DelayRate,
+      nghĩa là thay đổi sản lượng có tác động nhân quả trực tiếp — không phải
       noise ngẫu nhiên — lên tỷ lệ giao hàng trễ.
 
 Tham khảo:
@@ -102,10 +100,12 @@ from utils import get_logger, get_base_dir
 # ══════════════════════════════════════════════════════════════════════
 
 # Thứ tự biến gốc — KHỚP với Tầng 3 và Tầng 4
-ANALYSIS_VARIABLES = ["OEE_Score", "DelayRate", "Revenue", "OrderVolume"]
+ANALYSIS_VARIABLES = ["ProductionVolume", "DelayRate", "OrderDemand"]
 
-# Cholesky ordering: ngoại sinh → nội sinh (dựa trên kết quả half-life α)
-CHOLESKY_ORDER = ["OrderVolume", "OEE_Score", "Revenue", "DelayRate"]
+# Cholesky ordering: ngoại sinh → nội sinh
+# OrderDemand (ngoại sinh — thị trường quyết định) → ProductionVolume
+# (throughput phản ứng theo cầu) → DelayRate (nội sinh nhất — hấp thụ shock)
+CHOLESKY_ORDER = ["OrderDemand", "ProductionVolume", "DelayRate"]
 
 # Thời gian mô phỏng dư chấn
 IRF_PERIODS = 12
@@ -115,10 +115,9 @@ np.random.seed(42)
 
 # Nhãn hiển thị tiếng Việt cho biểu đồ
 DISPLAY_NAMES = {
-    "OEE_Score": "OEE Score",
-    "DelayRate": "Delay Rate",
-    "Revenue": "Doanh thu (Revenue)",
-    "OrderVolume": "Khối lượng đơn hàng (Order Volume)",
+    "ProductionVolume": "Sản lượng (Production Volume)",
+    "DelayRate": "Tỷ lệ trễ (Delay Rate)",
+    "OrderDemand": "Nhu cầu đặt hàng (Order Demand)",
 }
 
 # ══════════════════════════════════════════════════════════════════════
@@ -127,18 +126,16 @@ DISPLAY_NAMES = {
 
 # Palette phân biệt rõ ràng trên cả in đen trắng lẫn màn hình
 COLORS = {
-    "OEE_Score":   "#1B5E4B",   # xanh đậm — driver chính
-    "DelayRate":   "#C44E52",   # đỏ gạch — target variable
-    "Revenue":     "#4C72B0",   # xanh dương — biến tài chính
-    "OrderVolume": "#DD8452",   # cam — biến ngoại sinh
+    "ProductionVolume": "#1B5E4B",   # xanh đậm — throughput sản xuất
+    "DelayRate":        "#C44E52",   # đỏ gạch — target variable
+    "OrderDemand":      "#DD8452",   # cam — biến ngoại sinh (nhu cầu)
 }
 
 # Hatching patterns cho FEVD (hỗ trợ in đen trắng)
 HATCHES = {
-    "OEE_Score":   "//",
-    "DelayRate":   "",
-    "Revenue":     "\\\\",
-    "OrderVolume": "xx",
+    "ProductionVolume": "//",
+    "DelayRate":        "",
+    "OrderDemand":      "xx",
 }
 
 
@@ -308,7 +305,7 @@ def _compute_fevd(orth_irfs, n_vars, periods, chol_order, logger):
 
 def _plot_irf(orth_irfs, orth_se, chol_order, fig_path, logger):
     """
-    Vẽ biểu đồ IRF: phản ứng của DelayRate khi có shock từ OEE và OrderVolume.
+    Vẽ biểu đồ IRF: phản ứng của DelayRate khi có shock từ ProductionVolume và OrderDemand.
 
     Layout: 2 subplot ngang (1 hàng × 2 cột).
     Mỗi subplot: đường phản ứng ± dải tin cậy 95% (shaded area).
@@ -321,19 +318,19 @@ def _plot_irf(orth_irfs, orth_se, chol_order, fig_path, logger):
 
     response_idx = ANALYSIS_VARIABLES.index("DelayRate")
 
-    # Hai cú sốc cần vẽ: OEE_Score và OrderVolume
+    # Hai cú sốc cần vẽ: ProductionVolume và OrderDemand
     impulse_configs = [
         {
-            "var": "OEE_Score",
-            "shock_col": chol_order.index("OEE_Score"),
-            "title": "(a) Shock từ OEE Score → Delay Rate",
-            "color": COLORS["OEE_Score"],
+            "var": "ProductionVolume",
+            "shock_col": chol_order.index("ProductionVolume"),
+            "title": "(a) Shock từ Production Volume → Delay Rate",
+            "color": COLORS["ProductionVolume"],
         },
         {
-            "var": "OrderVolume",
-            "shock_col": chol_order.index("OrderVolume"),
-            "title": "(b) Shock từ Order Volume → Delay Rate",
-            "color": COLORS["OrderVolume"],
+            "var": "OrderDemand",
+            "shock_col": chol_order.index("OrderDemand"),
+            "title": "(b) Shock từ Order Demand → Delay Rate",
+            "color": COLORS["OrderDemand"],
         },
     ]
 
@@ -413,7 +410,7 @@ def _plot_fevd(fevd_data, chol_order, fig_path, logger):
 
     # Chuyển sang phần trăm
     # Thứ tự stack: từ dưới lên = DelayRate (lớn nhất) → các biến còn lại
-    stack_order = ["DelayRate", "OEE_Score", "OrderVolume", "Revenue"]
+    stack_order = ["DelayRate", "ProductionVolume", "OrderDemand"]
     stack_data = np.array([
         [dr_fevd[v][h] * 100 for h in range(IRF_PERIODS)]
         for v in stack_order
@@ -454,19 +451,15 @@ def _plot_fevd(fevd_data, chol_order, fig_path, logger):
         title_fontsize=9,
     )
 
-    # Annotation: đánh dấu giá trị OEE tại h=12
-    oee_h12 = dr_fevd["OEE_Score"][IRF_PERIODS - 1] * 100
-    delay_h12 = dr_fevd["DelayRate"][IRF_PERIODS - 1] * 100
-
     # Ghi chú tỷ lệ đóng góp cụ thể tại h=4 và h=12
     for h_mark in [4, 12]:
         idx = h_mark - 1
-        oee_pct = dr_fevd["OEE_Score"][idx] * 100
-        ov_pct = dr_fevd["OrderVolume"][idx] * 100
-        y_pos = dr_fevd["DelayRate"][idx] * 100 + oee_pct / 2
+        prod_pct = dr_fevd["ProductionVolume"][idx] * 100
+        od_pct = dr_fevd["OrderDemand"][idx] * 100
+        y_pos = dr_fevd["DelayRate"][idx] * 100 + prod_pct / 2
         ax.annotate(
-            f"OEE: {oee_pct:.1f}%\nVol: {ov_pct:.1f}%",
-            xy=(h_mark, y_pos + ov_pct / 2 + 1),
+            f"Prod: {prod_pct:.1f}%\nDemand: {od_pct:.1f}%",
+            xy=(h_mark, y_pos + od_pct / 2 + 1),
             fontsize=7.5, ha="center", va="bottom",
             color="#333333",
             bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="#CCCCCC",
@@ -655,19 +648,19 @@ def run_phase5(input_csv=None, phase3_json=None):
 
     # Log IRF cho 2 cặp quan trọng
     resp_idx = ANALYSIS_VARIABLES.index("DelayRate")
-    oee_col = CHOLESKY_ORDER.index("OEE_Score")
-    ov_col = CHOLESKY_ORDER.index("OrderVolume")
+    prod_col = CHOLESKY_ORDER.index("ProductionVolume")
+    od_col = CHOLESKY_ORDER.index("OrderDemand")
 
-    logger.info("IRF: Phản ứng DelayRate ← OEE shock (1 SD):")
+    logger.info("IRF: Phản ứng DelayRate ← ProductionVolume shock (1 SD):")
     for t in range(IRF_PERIODS + 1):
-        val = orth_irfs[t, resp_idx, oee_col]
-        se = orth_se[t, resp_idx, oee_col]
+        val = orth_irfs[t, resp_idx, prod_col]
+        se = orth_se[t, resp_idx, prod_col]
         logger.info(f"  t={t:2d}: {val:+.6f} (SE={se:.6f})")
 
-    logger.info("IRF: Phản ứng DelayRate ← OrderVolume shock (1 SD):")
+    logger.info("IRF: Phản ứng DelayRate ← OrderDemand shock (1 SD):")
     for t in range(IRF_PERIODS + 1):
-        val = orth_irfs[t, resp_idx, ov_col]
-        se = orth_se[t, resp_idx, ov_col]
+        val = orth_irfs[t, resp_idx, od_col]
+        se = orth_se[t, resp_idx, od_col]
         logger.info(f"  t={t:2d}: {val:+.6f} (SE={se:.6f})")
 
     # ══════════════════════════════════════════════════════════════════
@@ -746,11 +739,10 @@ def run_phase5(input_csv=None, phase3_json=None):
             "irf_periods": IRF_PERIODS,
             "cholesky_ordering": CHOLESKY_ORDER,
             "cholesky_ordering_rationale": (
-                "Ngoại sinh → nội sinh, dựa trên half-life từ ma trận α: "
-                "OrderVolume (exogenous, thị trường quyết định) → "
-                "OEE_Score (near-weakly-exogenous, half-life ~86 tuần) → "
-                "Revenue (phản ứng trung bình) → "
-                "DelayRate (fast responder, half-life ~0.7 tuần)"
+                "Ngoại sinh → nội sinh, dựa trên chuỗi nhân quả lý thuyết: "
+                "OrderDemand (exogenous, nhu cầu thị trường quyết định) → "
+                "ProductionVolume (throughput phản ứng theo cầu) → "
+                "DelayRate (nội sinh nhất, kết quả cuối cùng của hệ thống)"
             ),
             "orthogonalization": "Cholesky (Lütkepohl 2005, Mục 2.3.2)",
             "ci_method": "Asymptotic SE (Lütkepohl 2005, Prop. 3.6)",

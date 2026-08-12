@@ -9,8 +9,8 @@ Mục đích:
         Khi các chuỗi thời gian đều không dừng (I(1)) riêng lẻ, nhưng tồn
         tại TỔ HỢP TUYẾN TÍNH giữa chúng là dừng (I(0)) → các chuỗi này
         có quan hệ cân bằng dài hạn (long-run equilibrium). Ví dụ:
-          - OEE_Score và Revenue có thể lệch nhau ngắn hạn, nhưng luôn
-            quay về quan hệ cân bằng dài hạn.
+          - ProductionVolume và DelayRate có thể lệch nhau ngắn hạn, nhưng
+            luôn quay về quan hệ cân bằng dài hạn.
           - Số tổ hợp tuyến tính dừng = cointegration rank r.
 
     TẠI SAO rank r quan trọng:
@@ -68,7 +68,7 @@ logger = get_logger("phase3")
 
 SIGNIFICANCE_LEVEL = 0.05
 
-ANALYSIS_VARS = ["OEE_Score", "DelayRate", "Revenue", "OrderVolume"]
+ANALYSIS_VARS = ["ProductionVolume", "DelayRate", "OrderDemand"]
 
 # Loại deterministic trend trong mô hình Johansen:
 #   -1 = no deterministic terms
@@ -376,12 +376,12 @@ def _run_johansen_test(data, lag, var_names):
 
 def _run_sensitivity_analysis(df, lag, var_names, full_result):
     """
-    Loại tuần nội suy, chạy lại Johansen, so sánh rank.
+    Loại tuần forward-fill, chạy lại Johansen, so sánh rank.
 
     Nếu rank thay đổi → route VECM/VAR cũng thay đổi → kết luận kinh tế
-    lượng (có/không có quan hệ dài hạn) PHỤ THUỘC vào bước nội suy.
+    lượng (có/không có quan hệ dài hạn) PHỤ THUỘC vào bước forward-fill.
     """
-    interp_cols = [c for c in df.columns if c.startswith("is_interpolated")]
+    interp_cols = [c for c in df.columns if c.startswith("is_filled")]
     if not interp_cols:
         return None
 
@@ -390,14 +390,14 @@ def _run_sensitivity_analysis(df, lag, var_names, full_result):
 
     if n_excluded == 0:
         return {
-            "description": "Không có tuần nội suy — kết quả giống hoàn toàn.",
+            "description": "Không có tuần forward-fill — kết quả giống hoàn toàn.",
             "discrepancies": []
         }
 
     df_clean = df.loc[~any_interpolated].copy()
 
     logger.info(
-        f"\n--- SENSITIVITY: loại {n_excluded} tuần nội suy, "
+        f"\n--- SENSITIVITY: loại {n_excluded} tuần forward-fill, "
         f"còn {len(df_clean)} tuần ---"
     )
 
@@ -430,9 +430,9 @@ def _run_sensitivity_analysis(df, lag, var_names, full_result):
                 "clean_route": clean_result["route"],
                 "warning": (
                     f"Rank thay đổi từ {full_rank} (đầy đủ) sang "
-                    f"{clean_rank} (loại nội suy) → route cũng thay đổi: "
+                    f"{clean_rank} (loại forward-fill) → route cũng thay đổi: "
                     f"{full_result['route']} → {clean_result['route']}. "
-                    f"Kết luận CÓ THỂ PHỤ THUỘC vào bước nội suy."
+                    f"Kết luận CÓ THỂ PHỤ THUỘC vào bước forward-fill."
                 )
             }
             discrepancies.append(discrepancy)
@@ -445,7 +445,7 @@ def _run_sensitivity_analysis(df, lag, var_names, full_result):
             )
 
     return {
-        "description": "So sánh Johansen rank giữa dataset đầy đủ và dataset loại tuần nội suy.",
+        "description": "So sánh Johansen rank giữa dataset đầy đủ và dataset loại tuần forward-fill.",
         "n_observations_clean": len(df_clean),
         "clean_result": clean_result,
         "discrepancies": discrepancies
@@ -585,7 +585,7 @@ def run_phase3(input_path=None):
     logger.info(f"  - Route đề xuất: {route}")
     logger.info(f"  - {johansen_result.get('route_explanation', '')}")
     if sensitivity and sensitivity.get("discrepancies"):
-        logger.warning("  - ⚠ CÓ thay đổi khi loại tuần nội suy — xem sensitivity analysis!")
+        logger.warning("  - ⚠ CÓ thay đổi khi loại tuần forward-fill — xem sensitivity analysis!")
     logger.info("=" * 60)
 
     # -----------------------------------------------------------------
