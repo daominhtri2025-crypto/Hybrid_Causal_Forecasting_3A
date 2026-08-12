@@ -554,30 +554,28 @@ def run_tang4(input_csv=None, phase3_json=None):
 
     # Về k_ar_diff — mối quan hệ giữa VAR lag order và VECM k_ar_diff:
     #   VAR(p) ↔ VECM(k_ar_diff = p - 1)
-    #   Phase 3 chọn selected_lag = 1 (VAR order p=1)
-    #   → k_ar_diff = p - 1 = 0
-    #   → Johansen test chạy với k_ar_diff = 0 → xác định rank r = 2
+    #   Phase 3 chọn selected_lag qua AIC/BIC trên VAR.
+    #   k_ar_diff = selected_lag - 1
     #
-    # k_ar_diff = 0 nghĩa là VECM chỉ có error correction term (αβ'y_{t-1})
-    # và constant, KHÔNG có lagged differences (Γ·Δy_{t-1}). Với mẫu nhỏ
-    # (N=10), đây là lựa chọn HỢP LÝ NHẤT:
-    #   - k_ar_diff=0: 3 params/eq, ~9 eff obs, 6 DoF → ước lượng ổn định
-    #   - k_ar_diff=1: 7 params/eq, ~8 eff obs, 1 DoF → OVERFITTING nghiêm
-    #     trọng, dự báo bùng nổ
-    #
-    # Kết luận: dùng k_ar_diff=0 từ Phase 3 JSON — đây KHÔNG phải "tự tìm
-    # lại lag" mà là dùng ĐÚNG giá trị đã được Johansen test xác nhận.
-    k_ar_diff_from_json = phase3.get("johansen_result", {}).get("k_ar_diff", 0)
-    selected_lag_from_json = phase3.get("lag_selection", {}).get("selected_lag", 1)
+    # Khi tất cả biến I(0), Phase 3 bỏ qua Johansen → lag_selection = null.
+    # Tang 4 sẽ tự chọn lag bằng AIC trên levels (Schwert rule).
+    johansen_data = phase3.get("johansen_result") or {}
+    k_ar_diff_from_json = johansen_data.get("k_ar_diff", 0)
+    lag_selection_data = phase3.get("lag_selection") or {}
+    selected_lag_from_json = lag_selection_data.get("selected_lag", None)
 
     # KHÓA CỨNG — đọc từ Phase 3 JSON (CLAUDE.md mục 3.3)
     K_AR_DIFF = k_ar_diff_from_json  # = 0 (VAR lag p=1 → VECM k_ar_diff = p-1 = 0)
 
     logger.info("Tham số KHÓA CỨNG (Anti-Hallucination):")
     logger.info(f"  coint_rank    = {COINT_RANK} (từ Phase 3 Johansen Trace test)")
-    logger.info(f"  k_ar_diff     = {K_AR_DIFF} (từ Phase 3 JSON; "
-                f"VAR lag p={selected_lag_from_json} → VECM k_ar_diff = p-1 = "
-                f"{K_AR_DIFF})")
+    if selected_lag_from_json is not None:
+        logger.info(f"  k_ar_diff     = {K_AR_DIFF} (từ Phase 3 JSON; "
+                    f"VAR lag p={selected_lag_from_json} → VECM k_ar_diff = p-1 = "
+                    f"{K_AR_DIFF})")
+    else:
+        logger.info(f"  k_ar_diff     = {K_AR_DIFF} (Phase 3 bỏ qua Johansen → "
+                    f"lag sẽ được chọn bằng AIC trong bước VAR)")
     logger.info(f"  deterministic = 'co' (unrestricted constant — khớp Phase 3 "
                 f"det_order=1)")
     logger.info(f"  Route: {route} — {phase3.get('route_explanation', '')}")
@@ -622,8 +620,28 @@ def run_tang4(input_csv=None, phase3_json=None):
     # PHÂN NHÁNH: VAR routes → xử lý riêng và return sớm
     # ══════════════════════════════════════════════════════════════════
     if route in ("VAR_on_levels", "VAR_on_differences"):
+        # Khi Phase 3 bỏ qua Johansen (all I(0)), lag_selection = null
+        # → Tang 4 tự chọn lag bằng AIC trên levels (Schwert rule)
+        var_lag_order = selected_lag_from_json
+        if var_lag_order is None:
+            logger.info(
+                "Phase 3 không cung cấp selected_lag (Johansen bỏ qua). "
+                "Tang 4 tự chọn lag bằng AIC trên levels."
+            )
+            schwert_lag = int(12 * (n_obs / 100) ** 0.25)
+            max_lag_cap = min(schwert_lag, 26)
+            endog_df_sel = pd.DataFrame(endog, columns=ANALYSIS_VARIABLES)
+            var_model_sel = VARModel(endog_df_sel)
+            lag_result = var_model_sel.select_order(maxlags=max_lag_cap)
+            var_lag_order = max(1, lag_result.aic)
+            logger.info(
+                f"Schwert rule: max_lag={max_lag_cap}, "
+                f"AIC={lag_result.aic}, BIC={lag_result.bic} "
+                f"→ VAR lag={var_lag_order}"
+            )
+
         return _run_var_on_levels(
-            endog, df, n_obs, n_vars, selected_lag_from_json,
+            endog, df, n_obs, n_vars, var_lag_order,
             route, input_csv, phase3_json, base_dir, start_time, logger
         )
 

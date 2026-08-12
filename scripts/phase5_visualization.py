@@ -543,12 +543,18 @@ def run_phase5(input_csv=None, phase3_json=None):
 
     if route == "VECM":
         COINT_RANK = phase3["coint_rank"]
-        K_AR_DIFF = phase3.get("johansen_result", {}).get("k_ar_diff", 0)
+        johansen_data = phase3.get("johansen_result") or {}
+        K_AR_DIFF = johansen_data.get("k_ar_diff", 0)
         logger.info(f"  coint_rank = {COINT_RANK}")
         logger.info(f"  k_ar_diff  = {K_AR_DIFF}")
     else:
-        LAG_ORDER = phase3.get("lag_selection", {}).get("selected_lag", 1)
-        logger.info(f"  lag_order  = {LAG_ORDER}")
+        lag_sel_data = phase3.get("lag_selection") or {}
+        LAG_ORDER = lag_sel_data.get("selected_lag", None)
+        if LAG_ORDER is None:
+            # Phase 3 bỏ qua Johansen (all I(0)) → tự chọn lag bằng AIC
+            logger.info("  Phase 3 không cung cấp selected_lag → tự chọn bằng AIC")
+        else:
+            logger.info(f"  lag_order  = {LAG_ORDER}")
         if route == "VAR_on_differences":
             logger.info("  fit_on     = sai phân bậc 1 (Δy)")
 
@@ -587,14 +593,25 @@ def run_phase5(input_csv=None, phase3_json=None):
 
     else:  # VAR_on_levels hoặc VAR_on_differences
         if route == "VAR_on_differences":
-            # Sai phân bậc 1: IRF/FEVD trên Δy cho biết phản ứng trong
-            # thay đổi (changes), không phải mức (levels) — đây là diễn giải
-            # chuẩn khi biến gốc là I(1).
             endog_fit = np.diff(endog, axis=0)
             fit_label = "Δy (sai phân bậc 1)"
         else:
             endog_fit = endog
             fit_label = "levels"
+
+        # Tự chọn lag nếu Phase 3 không cung cấp (all I(0), Johansen bỏ qua)
+        if LAG_ORDER is None:
+            schwert_lag = int(12 * (len(endog_fit) / 100) ** 0.25)
+            max_lag_cap = min(schwert_lag, 26)
+            endog_df_sel = pd.DataFrame(endog_fit, columns=ANALYSIS_VARIABLES)
+            var_sel = VARModel(endog_df_sel)
+            lag_result = var_sel.select_order(maxlags=max_lag_cap)
+            LAG_ORDER = max(1, lag_result.aic)
+            logger.info(
+                f"Schwert rule: max_lag={max_lag_cap}, "
+                f"AIC={lag_result.aic}, BIC={lag_result.bic} "
+                f"→ VAR lag={LAG_ORDER}"
+            )
 
         logger.info(
             f"Fitting VAR(p={LAG_ORDER}, trend='c') trên {fit_label} — "
