@@ -567,8 +567,16 @@ def run_phase5(input_csv=None, phase3_json=None):
         )
 
     logger.info(f"Đọc dữ liệu: {input_csv}")
-    df = pd.read_csv(input_csv, parse_dates=["week_start"]).copy()
+    df_raw = pd.read_csv(input_csv, parse_dates=["week_start"]).copy()
+    n_raw = len(df_raw)
+
+    # Loại tuần có NaN — VAR/VECM không chấp nhận NaN
+    mask = df_raw[ANALYSIS_VARIABLES].notna().all(axis=1)
+    df = df_raw[mask].copy().reset_index(drop=True)
+    n_dropped = n_raw - len(df)
     n_obs = len(df)
+    if n_dropped > 0:
+        logger.info(f"Đã loại {n_dropped} tuần có NaN → còn {n_obs} tuần.")
     logger.info(f"Số quan sát: {n_obs} tuần")
 
     endog = df[ANALYSIS_VARIABLES].values.copy()

@@ -597,11 +597,21 @@ def run_tang4(input_csv=None, phase3_json=None):
         )
 
     logger.info(f"Đọc dữ liệu: {input_csv}")
-    df = pd.read_csv(input_csv, parse_dates=["week_start"]).copy()
+    df_raw = pd.read_csv(input_csv, parse_dates=["week_start"]).copy()
+    n_raw = len(df_raw)
+    logger.info(f"Đã tải: {n_raw} tuần (bao gồm tuần có NaN)")
+
+    # Loại bỏ tuần có NaN trong biến phân tích — VAR không chấp nhận NaN
+    mask = df_raw[ANALYSIS_VARIABLES].notna().all(axis=1)
+    df = df_raw[mask].copy().reset_index(drop=True)
+    n_dropped = n_raw - len(df)
     n_obs = len(df)
+    if n_dropped > 0:
+        logger.info(f"Đã loại {n_dropped} tuần có NaN → còn {n_obs} tuần dùng được.")
+
     date_min = df["week_start"].min().date()
     date_max = df["week_start"].max().date()
-    logger.info(f"Số quan sát: {n_obs} tuần, từ {date_min} đến {date_max}")
+    logger.info(f"Phạm vi dữ liệu: {date_min} → {date_max} ({n_obs} tuần)")
 
     # Trích xuất ma trận endogenous (thứ tự cố định, khớp Tầng 3)
     endog = df[ANALYSIS_VARIABLES].values.copy()
@@ -610,7 +620,6 @@ def run_tang4(input_csv=None, phase3_json=None):
     logger.info(f"Ma trận endogenous: {n_obs} × {n_vars} "
                 f"({', '.join(ANALYSIS_VARIABLES)})")
 
-    # Log thống kê mô tả nhanh để kiểm tra dữ liệu đầu vào
     for v_idx, var in enumerate(ANALYSIS_VARIABLES):
         col = endog[:, v_idx]
         logger.info(f"  {var}: min={col.min():.4f}, max={col.max():.4f}, "
