@@ -415,8 +415,10 @@ def _run_sensitivity_analysis(df, k, d_max, var_names, full_results):
             "discrepancies": []
         }
 
-    # Chọn lag mới cho dataset sạch
-    clean_max_lag = max(1, (len(df_clean) - d_max) // 4)
+    # Chọn lag mới cho dataset sạch — Schwert rule
+    T_clean = len(df_clean[var_names].dropna())
+    schwert_clean = int(12 * (T_clean / 100) ** 0.25)
+    clean_max_lag = max(1, min(schwert_clean, 26))
     clean_k, _ = _select_lag_on_levels(df_clean[var_names].dropna(), clean_max_lag)
 
     clean_results = _run_toda_yamamoto_pairwise(
@@ -539,8 +541,17 @@ def run_phase3b(input_path=None):
 
     # -----------------------------------------------------------------
     # Bước 3: Chọn lag k trên chuỗi mức
+    # Dùng Schwert (1989) rule: maxlag = 12*(T/100)^0.25, cap 26 tuần
+    # — đồng nhất với Phase 2 (Granger) để đối chiếu chéo công bằng
     # -----------------------------------------------------------------
-    max_lag = max(1, (len(data) - d_max) // 4)
+    T = len(data)
+    schwert_lag = int(12 * (T / 100) ** 0.25)
+    MAX_LAG_CAP = 26
+    max_lag = max(1, min(schwert_lag, MAX_LAG_CAP))
+    logger.info(
+        f"Schwert rule: 12*(T/100)^0.25 = {schwert_lag}, "
+        f"cap={MAX_LAG_CAP} → max_lag={max_lag}"
+    )
     k, lag_info = _select_lag_on_levels(data, max_lag)
 
     total_lag = k + d_max

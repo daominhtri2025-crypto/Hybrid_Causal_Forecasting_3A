@@ -413,7 +413,10 @@ def _run_sensitivity_analysis(df, lag, var_names, full_result):
         }
 
     clean_data = df_clean[var_names].values
-    clean_lag = min(lag, max(1, len(df_clean) // 4))
+    # Schwert rule cho dataset sạch
+    T_clean = len(df_clean)
+    schwert_clean = int(12 * (T_clean / 100) ** 0.25)
+    clean_lag = min(lag, max(1, min(schwert_clean, 26)))
 
     clean_result = _run_johansen_test(clean_data, clean_lag, var_names)
 
@@ -540,8 +543,16 @@ def run_phase3(input_path=None):
                 f"cho Johansen). Vẫn chạy nhưng kết quả CẦN THẬN TRỌNG."
             )
 
-        # Chọn lag
-        max_lag = max(1, len(data) // 4)
+        # Chọn lag — Schwert (1989) rule: 12*(T/100)^0.25, cap 26 tuần
+        # Đồng nhất với Phase 2 (Granger) và Phase 3b (Toda-Yamamoto)
+        T_data = len(data)
+        schwert_lag = int(12 * (T_data / 100) ** 0.25)
+        MAX_LAG_CAP = 26
+        max_lag = max(1, min(schwert_lag, MAX_LAG_CAP))
+        logger.info(
+            f"Schwert rule: 12*(T/100)^0.25 = {schwert_lag}, "
+            f"cap={MAX_LAG_CAP} → max_lag={max_lag}"
+        )
         lag, lag_info = _select_lag_for_johansen(data.values, max_lag)
 
         # Chạy Johansen
