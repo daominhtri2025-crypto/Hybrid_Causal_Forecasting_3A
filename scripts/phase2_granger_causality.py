@@ -63,11 +63,12 @@ SIGNIFICANCE_LEVEL = 0.05
 ANALYSIS_VARS = ["ProductionVolume", "DelayRate", "OrderDemand"]
 
 # Số lag tối đa để kiểm tra trong Granger test.
-# TẠI SAO maxlag là hàm của kích thước mẫu:
-#   Quá nhiều lag → ít bậc tự do → power thấp, F-test không đáng tin.
-#   Quá ít lag → bỏ sót quan hệ nhân quả có độ trễ dài.
-#   Quy tắc thực tiễn: maxlag ≤ T/3 (để giữ ít nhất 2/3 dữ liệu cho ước lượng).
-MAX_LAG_RATIO = 3  # maxlag = max(1, T // MAX_LAG_RATIO)
+# Schwert (1989) rule-of-thumb: maxlag = int(12 * (T/100)^(1/4))
+# Với T=412 → ~17 lag. Cap thêm ở 26 (nửa năm) cho dữ liệu tuần —
+# nhân quả Granger ở lag > 26 tuần (> 6 tháng) ít có ý nghĩa kinh tế
+# cho dữ liệu sản xuất. T/3 quá lớn khi T lớn → overfitting + spurious
+# significance do multiple testing không hiệu chỉnh.
+MAX_LAG_CAP = 26  # giới hạn cứng: 26 tuần (≈ 6 tháng)
 
 # Số quan sát tối thiểu (sau sai phân) để Granger test có ý nghĩa
 MIN_OBS_GRANGER = 10
@@ -234,8 +235,8 @@ def _run_pairwise_granger(df_diff, max_lag):
             # trong đó kiểm tra "x Granger-causes y?"
             test_data = df_diff[[effect_var, cause_var]].copy()
 
-            # Kiểm tra đủ dữ liệu cho số lag yêu cầu
-            effective_max_lag = min(max_lag, len(test_data) // 3)
+            # Đảm bảo đủ DoF: cần ít nhất 3*lag quan sát cho 2 biến
+            effective_max_lag = min(max_lag, len(test_data) // 4)
             if effective_max_lag < 1:
                 logger.warning(
                     f"  {pair_label}: không đủ dữ liệu cho bất kỳ lag nào "
@@ -375,8 +376,9 @@ def _run_sensitivity_analysis(df, d_values, max_lag, full_results):
             "discrepancies": []
         }
 
-    # Chạy lại Granger trên dataset sạch
-    clean_max_lag = max(1, len(df_clean_diff) // MAX_LAG_RATIO)
+    # Chạy lại Granger trên dataset sạch — dùng cùng Schwert rule + cap
+    clean_schwert = int(12 * (len(df_clean_diff) / 100) ** 0.25)
+    clean_max_lag = max(1, min(clean_schwert, MAX_LAG_CAP))
     clean_results = _run_pairwise_granger(df_clean_diff, clean_max_lag)
 
     # So sánh kết luận significant giữa full và clean
@@ -480,8 +482,10 @@ def run_phase2(input_path=None):
     # -----------------------------------------------------------------
     # Bước 3: Chọn lag tối ưu
     # -----------------------------------------------------------------
-    max_lag = max(1, len(df_diff) // MAX_LAG_RATIO)
-    logger.info(f"Max lag cho Granger test: {max_lag} (T={len(df_diff)}, ratio=T/{MAX_LAG_RATIO})")
+    # Schwert rule: int(12 * (T/100)^(1/4)), cap tại MAX_LAG_CAP (26 tuần)
+    schwert_lag = int(12 * (len(df_diff) / 100) ** 0.25)
+    max_lag = max(1, min(schwert_lag, MAX_LAG_CAP))
+    logger.info(f"Max lag cho Granger test: {max_lag} (T={len(df_diff)}, Schwert={schwert_lag}, cap={MAX_LAG_CAP})")
 
     optimal_lag, lag_info = _select_optimal_lag(df_diff, max_lag)
 
