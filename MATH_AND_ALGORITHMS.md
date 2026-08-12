@@ -3,6 +3,9 @@
 > Tài liệu kỹ thuật chuyên sâu trình bày **tất cả công thức toán học** được sử dụng
 > trong pipeline dự báo nhân quả hỗn hợp 4 tầng (Hybrid Causal Forecasting — Phương án 3-A).
 >
+> **Hệ thống 3 biến:** ProductionVolume, DelayRate, OrderDemand.
+> **Chuỗi nhân quả:** OrderDemand (áp lực cầu) → ProductionVolume (sản lượng) → DelayRate (tỷ lệ trễ giao hàng).
+>
 > Mọi công thức đều được trích xuất trực tiếp từ mã nguồn đã chạy, không có giá trị
 > nào bị hallucinate hay hard-code ngoài kết quả thực tế.
 
@@ -12,10 +15,10 @@
 
 ### 1.1. Jaccard Index — Đo lường Độ trùng lặp OrderNo
 
-Khi trích xuất 3 bảng dữ liệu (`cmt_oee_results`, `cmt_delay_results`, `fob_revenue`)
-từ SQL Server trong cùng một snapshot, cần đảm bảo tính **nhất quán đồng thời**
-(temporal consistency). Pipeline sử dụng **Jaccard Index** (Jaccard, 1901) để đo tỉ lệ
-khớp `OrderNo` giữa các file:
+Khi trích xuất dữ liệu từ nhiều bảng SQL Server trong cùng một snapshot, cần đảm bảo
+tính **nhất quán đồng thời** (temporal consistency). Pipeline sử dụng **Jaccard Index**
+(Jaccard, 1901) để đo tỉ lệ khớp `OrderNo` giữa các file (áp dụng cho các file có
+cột `OrderNo` chung):
 
 $$
 J(A, B, C) = \frac{|A \cap B \cap C|}{|A \cup B \cup C|}
@@ -38,100 +41,85 @@ $$
 > **Tính chất:** $J \in [0, 1]$; $J = 1$ khi 3 tập hoàn toàn trùng khớp;
 > $J = 0$ khi không có phần tử chung nào.
 
-### 1.2. OEE — Phân rã Hiệu suất Thiết bị Tổng thể (A × P × Q)
+### 1.2. ProductionVolume — Sản lượng Sản xuất Thực tế
 
-Chỉ số OEE (Overall Equipment Effectiveness) được tính theo phương pháp phân rã
-3 thành phần chuẩn quốc tế (Nakajima, 1988):
+**ProductionVolume** đo tổng sản lượng sản xuất thực tế (valued quantity) theo tuần,
+phản ánh **throughput** (năng lực xử lý) của hệ thống sản xuất. Đây là biến trung
+gian trong chuỗi nhân quả: OrderDemand → **ProductionVolume** → DelayRate.
+
+**Công thức tổng hợp:**
 
 $$
-\text{OEE} = A \times P \times Q
+\text{ProductionVolume}_{\text{week}} = \sum_{i \in \mathcal{W}} \text{ValuedQty}_i
 $$
 
 Trong đó:
-
-**Availability (Khả dụng máy)** — tỉ lệ thời gian máy vận hành thực tế so với
-kế hoạch, phản ánh tổn thất do dừng máy ngoài kế hoạch (downtime):
-
-$$
-A = \frac{\text{ActualWorkingMinutes}}{\text{PlannedOperatingMinutes}}
-$$
-
-**Performance (Hiệu năng)** — tỉ lệ năng suất thực tế so với năng suất lý thuyết,
-phản ánh tổn thất do chạy chậm (speed loss):
-
-$$
-P = \frac{\text{TotalQty} \times \text{StandardCycleTime}}{\text{ActualWorkingMinutes}}
-$$
-
-- $\text{TotalQty}$: tổng số sản phẩm sản xuất (bao gồm cả phế phẩm).
-- $\text{StandardCycleTime}$: thời gian chu kỳ chuẩn (phút/sản phẩm) theo thiết kế máy.
-- Tử số = thời gian lý thuyết cần để sản xuất $\text{TotalQty}$ sản phẩm ở tốc độ chuẩn.
-
-**Quality (Chất lượng)** — tỉ lệ sản phẩm đạt chất lượng, phản ánh tổn thất do
-phế phẩm (defect loss):
-
-$$
-Q = \frac{\text{GoodQty}}{\text{TotalQty}}
-$$
-
-**Kết hợp đầy đủ — dạng khai triển:**
-
-$$
-\text{OEE} = \frac{\text{ActualWorkingMinutes}}{\text{PlannedOperatingMinutes}}
-\times \frac{\text{TotalQty} \times \text{StandardCycleTime}}{\text{ActualWorkingMinutes}}
-\times \frac{\text{GoodQty}}{\text{TotalQty}}
-$$
-
-**Giản ước (simplification):**
-
-$$
-\text{OEE} = \frac{\text{GoodQty} \times \text{StandardCycleTime}}{\text{PlannedOperatingMinutes}}
-$$
-
-> **Lưu ý thực thi:** Trong SQL query (`SQL_OEE` ở `tang1_db_extractor.py`),
-> chúng tôi giữ NGUYÊN dạng 3 thành phần $A \times P \times Q$ — không dùng
-> dạng giản ước — để:
-> 1. Ghi nhận từng thành phần riêng biệt (cột `Availability`, `Performance`,
->    `Quality`) phục vụ phân tích nguyên nhân suy giảm OEE.
-> 2. Mỗi phép chia đều có `NULLIF(..., 0)` — nếu mẫu số = 0 thì thành phần
->    đó trả về `NULL`, OEE_Score tổng cũng `NULL` (ghi `WARNING` trong log).
-
-**Miền giá trị:**
-- $A, P, Q \in [0, 1]$ trong điều kiện lý tưởng (có thể > 1 nếu máy chạy
-  nhanh hơn thiết kế hoặc vận hành ngoài giờ).
-- $\text{OEE} \in [0, 1]$ thường thấy; OEE > 0.85 là "world-class" theo tiêu
-  chuẩn TPM (Total Productive Maintenance).
+- $\mathcal{W}$: tập các bút toán giá trị (Value Entry) thuộc tuần đang xét.
+- $\text{ValuedQty}_i$: trường `[Valued Quantity]` của bút toán thứ $i$ — số lượng
+  sản phẩm đã được định giá (phản ánh sản lượng thực tế đã hoàn thành và ghi nhận
+  vào sổ kế toán).
 
 **Nguồn dữ liệu SQL (Dynamics NAV — CSDL QTDN):**
-- `[Production Order Header]`: cung cấp `No_` (mã LSX), `Starting Date`, `Ending Date`.
-  Lưu ý: CSDL còn có `[Production Order Header Posted]` cho LSX đã đăng (posted) —
-  các hàm KPI hiện tại (KPI_2_64, KPI_2_67) dùng bảng Posted. Pipeline dùng Header
-  (chưa post) vì cần `[Ending Date]` và cột thống kê trên `[Production Order Line]`.
-- `[Production Order Line]`: cung cấp `Quantity` (PlanQty), `Finished Quantity` (RealQty),
-  `Scrap %` — JOIN với Header qua `[Prod_Order No_]` = Header.`[No_]`.
+- `[Value Entry]` (NAV Table 5802): bảng bút toán giá trị, ghi nhận mọi giao dịch
+  ảnh hưởng đến giá trị hàng tồn kho.
+- Filter: `[Source Type] IN (3, 4)` — chỉ lấy bút toán có nguồn từ:
+  - `3` = Work Center (Trung tâm gia công)
+  - `4` = Machine Center (Trung tâm máy)
+  Hai loại này đảm bảo chỉ tính sản lượng từ hoạt động sản xuất, loại trừ các
+  bút toán mua hàng, bán hàng, hay điều chỉnh tồn kho.
+- Nhóm theo: `[Posting Date]` → chuyển đổi sang tuần (Monday-based, xem mục 2.5).
 
-**Thích ứng NAV:** Do bảng NAV chuẩn không ghi trực tiếp `ActualWorkingMinutes`
-và `PlannedOperatingMinutes` (cần bổ sung `[Capacity Ledger Entry]` hoặc
-`[Production Order Routing Finished]` cho `Run Time`, `Setup Time`), pipeline hiện
-tại tính OEE theo dạng rút gọn **P × Q**:
+**Miền giá trị:** $\text{ProductionVolume} \geq 0$ (tổng sản lượng, đơn vị: sản phẩm).
+Tuần không có hoạt động sản xuất → $\text{ProductionVolume} = 0$.
+
+> **So sánh với OEE (phiên bản trước):** Phiên bản trước sử dụng chỉ số OEE
+> (Overall Equipment Effectiveness, Nakajima, 1988) với phân rã A x P x Q.
+> Tuy nhiên, bảng NAV không ghi trực tiếp `ActualWorkingMinutes` và
+> `PlannedOperatingMinutes`, dẫn đến OEE chỉ tính được dạng rút gọn P x Q.
+> ProductionVolume (từ Value Entry) phản ánh trực tiếp sản lượng thực tế —
+> đơn giản hơn, chính xác hơn, và không phụ thuộc vào các trường dữ liệu
+> bị thiếu trong cấu hình NAV của doanh nghiệp.
+
+### 1.3. OrderDemand — Nhu cầu Đặt hàng
+
+**OrderDemand** đo tổng số lượng sản phẩm được đặt hàng theo tuần, phản ánh
+**áp lực cầu** (demand pressure) từ khách hàng lên hệ thống sản xuất. Đây là
+biến đầu vào (exogenous driver) trong chuỗi nhân quả: **OrderDemand** →
+ProductionVolume → DelayRate.
+
+**Công thức tổng hợp:**
 
 $$
-\text{OEE}_{\text{NAV}} = \underbrace{\frac{\text{Finished Quantity}}{\text{Quantity}}}_{P}
-\times \underbrace{\left(1 - \frac{\text{Scrap \%}}{100}\right)}_{Q}
+\text{OrderDemand}_{\text{week}} = \sum_{j \in \mathcal{W}} \text{Quantity}_j
 $$
 
-Khi doanh nghiệp bổ sung dữ liệu thời gian máy thực tế, sẽ nâng cấp lên A × P × Q đầy đủ.
+Trong đó:
+- $\mathcal{W}$: tập các dòng đơn hàng bán (Sales Order Line) có ngày giao hàng
+  dự kiến thuộc tuần đang xét.
+- $\text{Quantity}_j$: trường `[Quantity]` của dòng đơn hàng thứ $j$ — số lượng
+  sản phẩm được đặt.
 
-**Nguồn dữ liệu Revenue (Doanh thu):**
-- `[Cust_ Ledger Entry]`: Sổ cái khách hàng (NAV Table ID 21), cột `[Sales (LCY)]`
-  chứa doanh thu bằng nội tệ (VND). Đây là bảng mà toàn bộ hàm KPI trong CSDL QTDN
-  thực sự sử dụng để tính doanh thu (xác nhận qua QTDN.sql: KPI_0_91, KPI_0_93,
-  KPI_2_51). Filter `[Document Type] = 2` (Invoice) để chỉ lấy hóa đơn bán hàng.
-- Lưu ý lịch sử: phiên bản trước dùng `[Import and Export Revenue Line].[Amount]` —
-  bảng này tồn tại trong CSDL nhưng không được tham chiếu bởi bất kỳ hàm KPI nào,
-  có thể chỉ phản ánh doanh thu XNK (một phần, không đầy đủ).
+**Nguồn dữ liệu SQL (Dynamics NAV — CSDL QTDN):**
+- `[Sales Order Line]` JOIN `[Sales Order Header]` trên `[Document No_]` = `[No_]`.
+- `[Sales Order Line]`: cung cấp `[Quantity]` (số lượng đặt hàng) và
+  `[Shipment Date]` (ngày giao hàng dự kiến).
+- Nhóm theo: `[Shipment Date]` → chuyển đổi sang tuần (Monday-based, xem mục 2.5).
 
-### 1.3. SHA-256 — Chốt tính Toàn vẹn Dữ liệu
+**Lý do dùng Shipment Date (không phải Order Date):**
+Ngày giao hàng dự kiến phản ánh thời điểm hệ thống sản xuất phải **đáp ứng** nhu
+cầu — tức áp lực thực tế lên năng lực sản xuất. Order Date (ngày đặt hàng) có thể
+xa thời điểm sản xuất, không phản ánh đúng áp lực tức thời.
+
+**Miền giá trị:** $\text{OrderDemand} \geq 0$ (tổng số lượng đặt, đơn vị: sản phẩm).
+Tuần không có đơn hàng nào cần giao → $\text{OrderDemand} = 0$.
+
+> **So sánh với Revenue (phiên bản trước):** Phiên bản trước sử dụng Revenue
+> (doanh thu từ `[Cust_ Ledger Entry].[Sales (LCY)]`). Revenue phản ánh kết quả
+> tài chính sau khi giao hàng và xuất hóa đơn — có **độ trễ** so với thời điểm
+> sản xuất. OrderDemand (từ Sales Order) phản ánh nhu cầu **trước** khi sản xuất —
+> đúng vai trò biến nguyên nhân (cause) trong chuỗi nhân quả.
+
+### 1.4. SHA-256 — Chốt tính Toàn vẹn Dữ liệu
 
 Mỗi file CSV sau khi ghi ra đĩa được tính **checksum SHA-256** (NIST FIPS 180-4)
 và ghi vào `MANIFEST.md`. Mục đích: phát hiện **bất kỳ thay đổi nào** (dù chỉ 1 bit)
@@ -158,32 +146,26 @@ giá trị đã ghi tại $t_1$, file CHẮC CHẮN đã bị sửa đổi giữ
 
 ## 2. Tầng 2 — Data Re-engineering (Phase 0)
 
-### 2.1. Trung bình có Trọng số (Weighted Average) — OEE_Score tuần
+### 2.1. Tổng hợp ProductionVolume và OrderDemand theo Tuần
 
-Khi gộp nhiều đơn hàng trong cùng 1 tuần thành 1 giá trị OEE đại diện, pipeline
-sử dụng **trung bình có trọng số** theo sản lượng thực tế `RealQty`:
-
-$$
-\overline{\text{OEE}}_{\text{week}} = \frac{\sum_{i=1}^{n} w_i \cdot \text{OEE}_i}{\sum_{i=1}^{n} w_i}
-$$
-
-Trong đó:
-- $n$: số đơn hàng hoàn thành trong tuần đó.
-- $\text{OEE}_i$: chỉ số hiệu suất thiết bị tổng thể của đơn hàng thứ $i$ (đã có sẵn trong `cmt_oee_results.csv`).
-- $w_i = \text{RealQty}_i$: trọng số = sản lượng sản xuất thực tế của đơn hàng $i$.
-
-**Lý do dùng trọng số:** Đơn hàng sản xuất 10,000 sản phẩm phải có ảnh hưởng lớn hơn
-đơn hàng 100 sản phẩm khi tính OEE trung bình tuần — phản ánh đúng khối lượng công
-việc thực tế trong tuần.
-
-**Phương trình fallback** khi mẫu số $\sum w_i = 0$ (tất cả đơn hàng có `RealQty = 0`):
+ProductionVolume và OrderDemand đều sử dụng phép **cộng đơn giản** (SUM) khi gộp
+theo tuần:
 
 $$
-\overline{\text{OEE}}_{\text{week}} = \frac{1}{n} \sum_{i=1}^{n} \text{OEE}_i \quad \text{(trung bình cộng đơn giản)}
+\text{ProductionVolume}_{\text{week}} = \sum_{i \in \mathcal{W}} \text{ValuedQty}_i
 $$
 
-> Script ghi `WARNING` khi fallback xảy ra — đây là bất thường dữ liệu (tuần có đơn hàng
-> nhưng sản lượng = 0 cho tất cả).
+$$
+\text{OrderDemand}_{\text{week}} = \sum_{j \in \mathcal{W}} \text{Quantity}_j
+$$
+
+**Lý do không cần weighted average:** Cả hai biến đều là **đại lượng tích lũy**
+(cumulative quantity), không phải tỷ lệ hay chỉ số hiệu suất. Tổng sản lượng
+hoặc tổng nhu cầu trong tuần chính là thước đo tự nhiên — không có vấn đề
+"đơn hàng lớn vs nhỏ" cần cân nhắc trọng số.
+
+**Miền giá trị:** Cả hai biến $\geq 0$. Tuần không có hoạt động → giá trị = 0
+(thông tin kinh tế hợp lệ, xem mục 2.3).
 
 ### 2.2. Tỷ lệ Trễ (DelayRate) — Tỷ lệ đơn hàng bị trễ trong tuần
 
@@ -195,29 +177,49 @@ Trong đó $\mathbb{1}[\cdot]$ là hàm chỉ thị (indicator function), $n$ l�
 hoàn thành trong tuần. DelayRate $\in [0, 1]$ — **KHÔNG áp dụng trọng số** vì mỗi đơn hàng
 đều quan trọng như nhau về mặt cam kết giao hàng, bất kể quy mô sản xuất.
 
-### 2.3. Nội suy Tuyến tính (Linear Interpolation) với Giới hạn $\text{limit} = 2$
+### 2.3. Xử lý Giá trị Thiếu (Gap Filling) — Phân biệt theo Bản chất Biến
 
-Đối với các biến là tỷ lệ (OEE_Score, DelayRate), NaN được lấp bằng nội suy tuyến tính
-giữa 2 điểm dữ liệu lân cận:
+Pipeline áp dụng **chiến lược khác nhau** cho từng loại biến, dựa trên bản chất
+kinh tế của giá trị thiếu:
+
+#### A. DelayRate — Forward-fill có giới hạn (Strategy A, CLAUDE.md mục 8)
 
 $$
-\hat{y}_t = y_{t_1} + \frac{y_{t_2} - y_{t_1}}{t_2 - t_1} \cdot (t - t_1)
+\hat{y}_t^{\text{delay}} = \begin{cases}
+y_{t^*} & \text{nếu } t - t^* \leq 4 \cdot \Delta_w \\
+\text{NaN} & \text{nếu } t - t^* > 4 \cdot \Delta_w
+\end{cases}
 $$
 
-Trong đó:
-- $y_{t_1}$: giá trị quan sát gần nhất **trước** vị trí cần nội suy.
-- $y_{t_2}$: giá trị quan sát gần nhất **sau** vị trí cần nội suy.
-- $t$: vị trí thời gian cần lấp (chỉ số tuần).
-- $t_1 < t < t_2$: hai vị trí lân cận có dữ liệu thực.
+- $y_{t^*}$: giá trị DelayRate quan sát gần nhất trước $t$.
+- Forward-fill tối đa **4 tuần liên tiếp** (limit=4).
+- Khoảng trống > 4 tuần giữ NaN — structural gap, không nên nội suy.
+- Cột `is_filled_delay` (boolean) đánh dấu dòng được forward-fill.
 
-**Giới hạn $\text{limit} = 2$:** Nội suy tuyến tính chỉ áp dụng cho **tối đa 2 tuần liên tiếp** bị thiếu. Nếu khoảng trống $> 2$ tuần → giữ nguyên NaN (không nội suy) vì:
-- Chuỗi thời gian ngắn (vài chục tuần): nội suy không giới hạn tạo giá trị vô nghĩa.
-- Khoảng trống dài ở đầu/cuối chuỗi: ngoại suy (extrapolation) nguy hiểm hơn nội suy.
+**Lý do dùng forward-fill cho DelayRate:** xem mục 2.4 bên dưới (giữ nguyên
+phân tích chi tiết).
 
-**Hướng nội suy:** `limit_direction='both'` — nội suy cả từ trái sang phải (forward) và phải sang trái (backward), cho phép lấp NaN ở đầu/cuối chuỗi nếu trong giới hạn.
+#### B. ProductionVolume và OrderDemand — fillna(0)
 
-**Đối với Revenue và OrderVolume (tổng/đếm):** Dùng `fillna(0)` — "không có giao dịch"
-là thông tin hợp lệ (giá trị 0 có ý nghĩa kinh tế thật).
+$$
+\hat{y}_t^{\text{prod}} = \begin{cases}
+y_t & \text{nếu } y_t \neq \text{NaN} \\
+0 & \text{nếu } y_t = \text{NaN}
+\end{cases}
+\qquad
+\hat{y}_t^{\text{demand}} = \begin{cases}
+y_t & \text{nếu } y_t \neq \text{NaN} \\
+0 & \text{nếu } y_t = \text{NaN}
+\end{cases}
+$$
+
+"Không có hoạt động sản xuất" ($\text{ProductionVolume} = 0$) và "không có đơn
+hàng cần giao" ($\text{OrderDemand} = 0$) là **thông tin kinh tế hợp lệ** — giá
+trị 0 có ý nghĩa thực (zero activity), không phải dữ liệu bị thiếu.
+
+> **Lưu ý:** Cột `is_filled_delay` chỉ áp dụng cho DelayRate. ProductionVolume
+> và OrderDemand không cần cờ đánh dấu vì `fillna(0)` là phép gán xác định —
+> không có giả định nào về xu hướng hay trạng thái trước đó.
 
 ### 2.4. Forward-fill Khoảng trống Thời gian (Gap Handling — Strategy A)
 
@@ -272,17 +274,17 @@ Forward-fill phù hợp hơn nội suy tuyến tính cho `DelayRate` vì 3 lý d
 
 #### Bước 3: Đánh dấu minh bạch
 
-Cột `is_filled` (boolean) ghi nhận mọi dòng được forward-fill:
+Cột `is_filled_delay` (boolean) ghi nhận mọi dòng DelayRate được forward-fill:
 
 $$
-\text{is\_filled}_t = \begin{cases}
-\text{True} & \text{nếu } y_t \text{ gốc là NaN AND } \hat{y}_t \neq \text{NaN} \\
+\text{is\_filled\_delay}_t = \begin{cases}
+\text{True} & \text{nếu } \text{DelayRate}_t \text{ gốc là NaN AND } \hat{y}_t \neq \text{NaN} \\
 \text{False} & \text{ngược lại}
 \end{cases}
 $$
 
 Tầng 3 (Phase 1 trở đi) sử dụng cờ này cho phân tích độ nhạy: chạy lại kiểm
-định trên tập dữ liệu loại tuần `is_filled = True` để đánh giá tác động
+định trên tập dữ liệu loại tuần `is_filled_delay = True` để đánh giá tác động
 forward-fill lên kết luận thống kê.
 
 > **Tham chiếu:** Chiến lược forward-fill có giới hạn phù hợp với khuyến nghị
@@ -297,7 +299,7 @@ $$
 $$
 
 Trong đó $\text{weekday}(d) \in \{0, 1, ..., 6\}$ (Monday = 0, Sunday = 6). Kết quả là
-ngày thứ Hai (Monday) của tuần chứa $d$ — dùng làm trục thời gian chung khi merge 3 nguồn.
+ngày thứ Hai (Monday) của tuần chứa $d$ — dùng làm trục thời gian chung khi merge các nguồn dữ liệu (ProductionVolume, DelayRate, OrderDemand).
 
 ---
 
@@ -419,12 +421,11 @@ lý như dừng (bảo thủ) — tránh over-differencing.
 
 | Biến | $d(i)$ | Phân loại |
 |------|---------|-----------|
-| OEE_Score | 1 | $I(1)$ |
-| DelayRate | 0 | $I(0)$ |
-| Revenue | 0 | $I(0)$ |
-| OrderVolume | 0 | $I(0)$ |
+| ProductionVolume | _[chạy lại pipeline]_ | _[chạy lại]_ |
+| DelayRate | _[chạy lại pipeline]_ | _[chạy lại]_ |
+| OrderDemand | _[chạy lại pipeline]_ | _[chạy lại]_ |
 
-$d_{\max} = \max\{d(i)\} = 1$ (dùng cho Toda-Yamamoto).
+$d_{\max} = \max\{d(i)\}$ _[chạy lại pipeline để xác định]_ (dùng cho Toda-Yamamoto).
 
 ### 3.4. Kiểm định Đồng tích hợp Johansen (Phase 3)
 
@@ -442,7 +443,7 @@ $$
 Trong đó:
 - $T$: số quan sát hiệu dụng.
 - $\hat{\lambda}_i$: eigenvalue thứ $i$ (sắp xếp giảm dần: $\hat{\lambda}_1 \geq \hat{\lambda}_2 \geq ... \geq \hat{\lambda}_n$).
-- $n$: số biến trong hệ thống (= 4 trong dự án này).
+- $n$: số biến trong hệ thống (= 3 trong dự án này).
 
 **Ý nghĩa:** Trace statistic kiểm tra xem có **nhiều hơn** $r$ vector đồng tích hợp hay không — tổng hợp bằng chứng từ tất cả eigenvalue còn lại $(\hat{\lambda}_{r+1}, ..., \hat{\lambda}_n)$.
 
@@ -464,17 +465,16 @@ $$
 
 Khi Trace và Max-Eigenvalue cho rank khác nhau, ưu tiên **Trace** (Johansen & Juselius, 1990 — Trace ổn định hơn trong mẫu hữu hạn).
 
-#### 3.4.4. Quyết định Rank $r = 2$ của Dự án
+#### 3.4.4. Quyết định Rank $r$ của Dự án
 
-Với $n = 4$ biến, kết quả Johansen test (det_order = 1, $k\_ar\_diff = 0$):
+Với $n = 3$ biến (ProductionVolume, DelayRate, OrderDemand), kết quả Johansen test:
 
-- $H_0: r \leq 0$ → **Bác bỏ** (cả Trace lẫn Max-Eigenvalue)
-- $H_0: r \leq 1$ → **Bác bỏ** (cả Trace lẫn Max-Eigenvalue)
-- $H_0: r \leq 2$ → **Giữ** (không bác bỏ)
+_[Chạy lại pipeline để xác định rank $r$ — kết quả cũ dựa trên hệ 4 biến không còn hợp lệ.]_
 
-→ **$r = 2$**: tồn tại **2 vector đồng tích hợp** — 2 quan hệ cân bằng dài hạn giữa 4 biến.
-
-**Route:** $0 < r = 2 < n = 4$ → sử dụng **VECM** (Vector Error Correction Model).
+**Route:** Tùy thuộc vào rank $r$ xác định từ pipeline:
+- $0 < r < n = 3$ → **VECM** (Vector Error Correction Model)
+- $r = 0$ → **VAR trên sai phân** (không có đồng tích hợp)
+- $r = n = 3$ → **VAR trên mức** (tất cả chuỗi dừng)
 
 ### 3.5. Kiểm định Nhân quả Toda-Yamamoto (Phase 3b)
 
@@ -490,11 +490,11 @@ y_t = c + \underbrace{\sum_{j=1}^{k} A_j \, y_{t-j}}_{\text{k lag kiểm định
 $$
 
 Trong đó:
-- $y_t \in \mathbb{R}^n$: vector biến nội sinh (4 biến).
-- $k$: lag tối ưu chọn trên chuỗi mức bằng AIC (= 1 trong dự án).
-- $d_{\max} = 1$: bậc tích hợp lớn nhất (từ Phase 1).
+- $y_t \in \mathbb{R}^n$: vector biến nội sinh (3 biến).
+- $k$: lag tối ưu chọn trên chuỗi mức bằng AIC _[chạy lại pipeline]_.
+- $d_{\max}$: bậc tích hợp lớn nhất (từ Phase 1) _[chạy lại pipeline]_.
 - $A_j \in \mathbb{R}^{n \times n}$: ma trận hệ số lag $j$.
-- Tổng lag mô hình: $k + d_{\max} = 1 + 1 = 2$.
+- Tổng lag mô hình: $k + d_{\max}$ [chạy lại pipeline để xác định].
 
 #### 3.5.2. Kiểm định Wald
 
@@ -529,9 +529,9 @@ $$
 $$
 
 Trong đó:
-- $y_t \in \mathbb{R}^n$: vector $n$ biến nội sinh tại thời điểm $t$ ($n = 4$).
+- $y_t \in \mathbb{R}^n$: vector $n$ biến nội sinh tại thời điểm $t$ ($n = 3$: ProductionVolume, DelayRate, OrderDemand).
 - $\Delta y_t = y_t - y_{t-1}$: sai phân bậc 1.
-- $\beta \in \mathbb{R}^{n \times r}$: ma trận vector đồng tích hợp ($r = 2$).
+- $\beta \in \mathbb{R}^{n \times r}$: ma trận vector đồng tích hợp ($r$ xác định từ Johansen test).
 - $\alpha \in \mathbb{R}^{n \times r}$: ma trận tốc độ điều chỉnh (loading coefficients).
 - $\Gamma_i \in \mathbb{R}^{n \times n}$: hệ số ngắn hạn (short-run dynamics) cho lag $i$.
 - $k$: `k_ar_diff` = 0 → **không có thành phần $\Gamma$** trong mô hình thực tế.
@@ -544,12 +544,12 @@ $$
 \boxed{\Delta y_t = \alpha \cdot \beta' y_{t-1} + c + u_t}
 $$
 
-Mô hình **chỉ có error correction term và constant** — không có lagged differences ($\Gamma$). Đây là lựa chọn phù hợp với mẫu nhỏ ($N = 10$, DoF = 6/equation).
+Mô hình **chỉ có error correction term và constant** — không có lagged differences ($\Gamma$). Đây là lựa chọn phù hợp với mẫu nhỏ (DoF giới hạn khi $n = 3$).
 
 ### 4.2. Ma trận Impact $\Pi = \alpha \cdot \beta'$ (Phân rã Rank)
 
 $$
-\Pi = \alpha \cdot \beta' \in \mathbb{R}^{n \times n}, \quad \text{rank}(\Pi) = r = 2
+\Pi = \alpha \cdot \beta' \in \mathbb{R}^{n \times n}, \quad \text{rank}(\Pi) = r
 $$
 
 Ma trận $\Pi$ nắm bắt **toàn bộ thông tin dài hạn** của hệ thống. Phân rã thành $\alpha \cdot \beta'$ tách biệt:
@@ -558,72 +558,55 @@ Ma trận $\Pi$ nắm bắt **toàn bộ thông tin dài hạn** của hệ th�
 
 ### 4.3. Phương trình Đồng tích hợp Dài hạn (Cointegrating Equations)
 
-Kết quả thực tế từ VECM fit ($r = 2$ vector):
+_[Kết quả cụ thể cần chạy lại pipeline với hệ 3 biến mới. Cấu trúc tổng quát:]_
 
-#### CE1 (Cointegrating Equation 1):
-
-$$
-\underbrace{1.000000}_{\beta_{11}} \cdot \text{OEE\_Score} + \underbrace{(\approx 0)}_{\beta_{21}} \cdot \text{DelayRate} + \underbrace{(-8.20 \times 10^{-7})}_{\beta_{31}} \cdot \text{Revenue} + \underbrace{0.091302}_{\beta_{41}} \cdot \text{OrderVolume} \approx 0
-$$
-
-**Diễn giải:** CE1 chủ yếu liên kết OEE_Score với OrderVolume — mỗi đơn vị tăng OrderVolume đi kèm OEE giảm $\approx 0.091$ trong dài hạn (quan hệ tỷ lệ nghịch).
-
-#### CE2 (Cointegrating Equation 2):
+Với $r$ vector đồng tích hợp (xác định bởi Johansen test ở mục 3.4), mỗi CE có dạng:
 
 $$
-\underbrace{(\approx 0)}_{\beta_{12}} \cdot \text{OEE\_Score} + \underbrace{1.000000}_{\beta_{22}} \cdot \text{DelayRate} + \underbrace{6.79 \times 10^{-6}}_{\beta_{32}} \cdot \text{Revenue} + \underbrace{(-0.659381)}_{\beta_{42}} \cdot \text{OrderVolume} \approx 0
+\beta_1 \cdot \text{ProductionVolume} + \beta_2 \cdot \text{DelayRate} + \beta_3 \cdot \text{OrderDemand} \approx 0
 $$
 
-**Diễn giải:** CE2 chủ yếu liên kết DelayRate với OrderVolume — mỗi đơn vị tăng OrderVolume đi kèm DelayRate tăng $\approx 0.659$ (nhiều đơn hàng hơn → tỷ lệ trễ cao hơn).
+**Kỳ vọng kinh tế:** Quan hệ dài hạn giữa OrderDemand (nhu cầu) → ProductionVolume
+(sản lượng đáp ứng) → DelayRate (tỷ lệ trễ do quá tải).
 
 #### Dạng ma trận $\beta$ (normalized):
 
 $$
-\beta = \begin{pmatrix}
-1.000000 & \approx 0 \\
-\approx 0 & 1.000000 \\
--8.20 \times 10^{-7} & 6.79 \times 10^{-6} \\
-0.091302 & -0.659381
-\end{pmatrix}
+\beta \in \mathbb{R}^{3 \times r}
 \quad
 \begin{matrix}
-\leftarrow \text{OEE\_Score} \\
+\leftarrow \text{ProductionVolume} \\
 \leftarrow \text{DelayRate} \\
-\leftarrow \text{Revenue} \\
-\leftarrow \text{OrderVolume}
+\leftarrow \text{OrderDemand}
 \end{matrix}
 $$
+
+_[Giá trị cụ thể: chạy lại pipeline — xem `reports/phase3_cointegration.json`]_
 
 ### 4.4. Ma trận Hệ số Điều chỉnh Tốc độ $\alpha$ (Speed of Adjustment)
 
 $$
-\alpha = \begin{pmatrix}
--1.1261 & -0.1500 \\
-+0.2171 & +0.0060 \\
-+1{,}258{,}017.9 & -391{,}622.1 \\
-+0.1568 & -2.3527
-\end{pmatrix}
+\alpha \in \mathbb{R}^{3 \times r}
 \quad
 \begin{matrix}
-\leftarrow \text{OEE\_Score} \\
+\leftarrow \text{ProductionVolume} \\
 \leftarrow \text{DelayRate} \\
-\leftarrow \text{Revenue} \\
-\leftarrow \text{OrderVolume}
+\leftarrow \text{OrderDemand}
 \end{matrix}
 $$
 
+_[Giá trị cụ thể: chạy lại pipeline — xem `reports/tang4_vecm_results.json`]_
+
 **Diễn giải cơ chế hội tụ:**
 
-| Biến | $\alpha_{i,1}$ (CE1) | $\alpha_{i,2}$ (CE2) | Diễn giải |
-|------|---------------------|---------------------|-----------|
-| OEE_Score | $-1.126$ | $-0.150$ | Phản ứng **mạnh** với CE1: error correcting (tự điều chỉnh giảm khi lệch dương) |
-| DelayRate | $+0.217$ | $+0.006$ | Khuếch đại nhẹ lệch CE1; gần như không phản ứng CE2 (weakly exogenous) |
-| Revenue | $+1.26 \times 10^6$ | $-3.92 \times 10^5$ | Phản ứng cực mạnh (do thang đo lớn — VNĐ) |
-| OrderVolume | $+0.157$ | $-2.353$ | Phản ứng mạnh với CE2: error correcting cho cân bằng Delay-Order |
+| Biến | $\alpha_{i,1}$ (CE1) | Diễn giải kỳ vọng |
+|------|---------------------|-----------|
+| ProductionVolume | _[chạy lại]_ | Error correcting nếu $\alpha < 0$: sản lượng tự điều chỉnh khi lệch cân bằng |
+| DelayRate | _[chạy lại]_ | Kỳ vọng weakly exogenous nếu $|\alpha| \approx 0$ |
+| OrderDemand | _[chạy lại]_ | Nhu cầu đặt hàng — có thể exogenous (ít bị ảnh hưởng bởi ECT) |
 
 **Ý nghĩa kinh tế của $\alpha < 0$ (error correcting):**
 - Khi ECT > 0 (hệ thống lệch khỏi cân bằng theo hướng dương), biến có $\alpha < 0$ sẽ **giảm** ở kỳ tiếp theo → kéo hệ thống quay về cân bằng.
-- $|\alpha| = 1.126$ cho OEE_Score/CE1 nghĩa là: nếu OEE lệch cân bằng 1 đơn vị, OEE sẽ "quá điều chỉnh" (overcorrect) hơn 100% trong 1 tuần → dao động hội tụ.
 
 ### 4.5. Khoảng tin cậy Dự báo — Phương pháp IRF/MA (Lütkepohl, 2005)
 
@@ -694,11 +677,11 @@ $$
 $$
 
 Trong đó:
-- $\mathcal{L}$: log-likelihood ($= -63.40$ trong dự án).
-- $k$: tổng số tham số ($= 12$: 4 biến × 3 params/eq).
-- $T$: số quan sát hiệu dụng ($= 9$).
+- $\mathcal{L}$: log-likelihood _[chạy lại pipeline]_.
+- $k$: tổng số tham số (3 biến × params/eq — tùy thuộc $r$ và $k\_ar\_diff$).
+- $T$: số quan sát hiệu dụng _[chạy lại pipeline]_.
 
-**Kết quả:** AIC = 150.80, BIC = 153.17.
+**Kết quả:** _[Chạy lại pipeline — xem `reports/tang4_vecm_results.json`]_
 
 ---
 

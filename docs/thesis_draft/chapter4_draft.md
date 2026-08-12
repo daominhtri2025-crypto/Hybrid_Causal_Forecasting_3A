@@ -2,8 +2,8 @@
 
 > **Phương pháp Hybrid Causal Forecasting — Phương án 3-A**
 >
-> Dữ liệu: 375 quan sát tuần (01/2018 – 01/2026), 4 biến nội sinh:
-> OEE Score, Delay Rate, Revenue, Order Volume.
+> Dữ liệu: 375 quan sát tuần (01/2018 – 01/2026), 3 biến nội sinh:
+> Production Volume, Delay Rate, Order Demand.
 
 ---
 
@@ -60,23 +60,21 @@ lý như dừng (bảo thủ) nhằm tránh over-differencing.
 
 | Biến | ADF (level) | KPSS (level) | Kết luận level | ADF (1st diff) | KPSS (1st diff) | $d(i)$ |
 |------|:-----------:|:------------:|:--------------:|:--------------:|:---------------:|:------:|
-| OEE Score | −0.743 (p=0.835) | 0.350 (p=0.099) | Inconclusive | −4.172 (p<0.001)*** | 0.212 (p>0.10) | **1** |
-| Delay Rate | −2.293 (p=0.174) | 0.365 (p=0.092) | Inconclusive | −11.502 (p<0.001)*** | 0.200 (p>0.10) | **1** |
-| Revenue | +0.735 (p=0.991) | 0.247 (p>0.10) | Inconclusive | −3.929 (p=0.002)** | 0.407 (p=0.074) | **1** |
-| Order Volume | −3.403 (p=0.011)* | 0.316 (p>0.10) | Stationary | — | — | **0** |
+| ProductionVolume | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+| DelayRate | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+| OrderDemand | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
 
 *Ghi chú: Giá trị tới hạn ADF 5% ≈ −2.870; KPSS 5% = 0.463. \*, \*\*, \*\*\* tương ứng mức ý nghĩa 10%, 5%, 1%.*
 
 ### 4.1.3. Nhận xét
 
-Ba biến OEE Score, Delay Rate, và Revenue đều thuộc I(1) — không dừng ở mức gốc
-nhưng dừng sau sai phân bậc 1. Riêng Order Volume thuộc I(0) — dừng ngay ở mức
-gốc (ADF bác bỏ $H_0$ tại 5%, KPSS không bác bỏ $H_0$ dừng). Bậc tích hợp tối đa
-$d_{max} = 1$.
+[Chạy lại pipeline để cập nhật] — Kết quả kiểm định tính dừng cho 3 biến
+ProductionVolume, DelayRate, và OrderDemand sẽ xác định bậc tích hợp $d(i)$
+và bậc tích hợp tối đa $d_{max}$.
 
-Sự tồn tại của ít nhất 2 biến I(1) trong hệ thống mở ra khả năng kiểm định
-đồng tích hợp Johansen — nếu tồn tại quan hệ cân bằng dài hạn giữa các biến
-I(1), mô hình VECM sẽ là lựa chọn phù hợp hơn VAR thuần túy.
+Nếu tồn tại ít nhất 2 biến I(1) trong hệ thống, kiểm định đồng tích hợp
+Johansen sẽ được thực hiện — nếu tồn tại quan hệ cân bằng dài hạn giữa các
+biến I(1), mô hình VECM sẽ là lựa chọn phù hợp hơn VAR thuần túy.
 
 ---
 
@@ -85,7 +83,7 @@ I(1), mô hình VECM sẽ là lựa chọn phù hợp hơn VAR thuần túy.
 ### 4.2.1. Thiết lập kiểm định
 
 Kiểm định đồng tích hợp Johansen (Johansen, 1995) được thực hiện trên hệ thống
-4 biến ở mức gốc (levels) với các tham số:
+3 biến ở mức gốc (levels) với các tham số:
 
 - **Deterministic trend**: Unrestricted constant (`det_order=1`) — cho phép hằng số
   nằm ngoài quan hệ đồng tích hợp (Lütkepohl, 2005, Chương 6).
@@ -98,32 +96,28 @@ Kiểm định đồng tích hợp Johansen (Johansen, 1995) được thực hi�
 
 | Giả thuyết $H_0$ | Trace statistic | Giá trị tới hạn 5% | Bác bỏ? |
 |:-----------------:|:---------------:|:-------------------:|:-------:|
-| $r \leq 0$ | **496.858** | 55.246 | **Có** |
-| $r \leq 1$ | **192.878** | 35.012 | **Có** |
-| $r \leq 2$ | 18.314 | 18.399 | Không |
+| $r \leq 0$ | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+| $r \leq 1$ | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
 
 **Bảng 4.3: Kiểm định Johansen — Max-Eigenvalue test**
 
 | Giả thuyết $H_0$ | Max-Eigen statistic | Giá trị tới hạn 5% | Bác bỏ? |
 |:-----------------:|:-------------------:|:-------------------:|:-------:|
-| $r = 0$ | **303.980** | 30.815 | **Có** |
-| $r = 1$ | **174.564** | 24.252 | **Có** |
-| $r = 2$ | 16.903 | 17.148 | Không |
+| $r = 0$ | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+| $r = 1$ | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
 
-**Eigenvalues**: $\lambda_1 = 0.5564$, $\lambda_2 = 0.3730$, $\lambda_3 = 0.0442$, $\lambda_4 = 0.0038$.
+**Eigenvalues**: [Chạy lại pipeline để cập nhật] ($n = 3$ biến, tối đa 3 eigenvalues).
 
 ### 4.2.3. Xác định hạng đồng tích hợp
 
-Cả Trace test và Max-Eigenvalue test đều nhất quán (consistent) xác định
-**hạng đồng tích hợp $r = 2$**. Trace statistic tại $H_0: r \leq 2$ (18.314)
-rất sát giá trị tới hạn 5% (18.399) — khác biệt chỉ 0.085 — nhưng không
-vượt ngưỡng, nên không đủ cơ sở bác bỏ $H_0: r \leq 2$.
+[Chạy lại pipeline để cập nhật] — Kết quả Trace test và Max-Eigenvalue test
+sẽ xác định hạng đồng tích hợp $r$ cho hệ thống 3 biến.
 
-Kết quả $0 < r = 2 < n = 4$ xác nhận:
-- Tồn tại **2 vector đồng tích hợp** (2 quan hệ cân bằng dài hạn) giữa các biến.
-- **Route phân tích: VECM** (Vector Error Correction Model) với 2 error
+Kết quả $0 < r < n = 3$ sẽ xác nhận:
+- Tồn tại $r$ vector đồng tích hợp ($r$ quan hệ cân bằng dài hạn) giữa các biến.
+- **Route phân tích: VECM** (Vector Error Correction Model) với $r$ error
   correction terms.
-- Hệ thống có $n - r = 2$ common stochastic trends (xu hướng ngẫu nhiên chung).
+- Hệ thống có $n - r$ common stochastic trends (xu hướng ngẫu nhiên chung).
 
 ---
 
@@ -136,12 +130,12 @@ Mô hình VECM được ước lượng với tham số khóa cứng từ Phase 
 $$\Delta y_t = \alpha \cdot \beta' y_{t-1} + \mu + u_t$$
 
 trong đó:
-- $y_t = (\text{OEE}_t, \text{Delay}_t, \text{Revenue}_t, \text{Volume}_t)'$
-- $\alpha$ ($4 \times 2$): ma trận tốc độ điều chỉnh (loading matrix)
-- $\beta$ ($4 \times 2$): ma trận đồng tích hợp (cointegrating vectors)
+- $y_t = (\text{ProductionVolume}_t, \text{DelayRate}_t, \text{OrderDemand}_t)'$
+- $\alpha$ ($3 \times r$): ma trận tốc độ điều chỉnh (loading matrix)
+- $\beta$ ($3 \times r$): ma trận đồng tích hợp (cointegrating vectors)
 - $\mu$: hằng số không hạn chế (unrestricted constant)
 - $u_t \sim N(0, \Sigma_u)$: nhiễu trắng
-- $k_{ar\_diff} = 0$: không có lagged differences ($\Gamma$ terms)
+- $k_{ar\_diff}$: [Chạy lại pipeline để cập nhật]
 
 ### 4.3.2. Ma trận đồng tích hợp $\beta$
 
@@ -149,38 +143,45 @@ trong đó:
 
 | Biến | $\beta_1$ (CE₁) | $\beta_2$ (CE₂) |
 |------|:----------------:|:----------------:|
-| OEE Score | **1.0000** | ≈ 0 |
-| Delay Rate | ≈ 0 | **1.0000** |
-| Revenue | ≈ 0 | ≈ 0 |
-| Order Volume | **+0.0631** | **−0.0437** |
+| ProductionVolume | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+| DelayRate | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+| OrderDemand | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+
+*Ghi chú: Số cột CE phụ thuộc vào hạng đồng tích hợp $r$ xác định từ Phase 3. Bảng trên giả định $r = 2$; nếu $r = 1$ thì chỉ có 1 cột CE.*
 
 ### 4.3.3. Phương trình cân bằng dài hạn
 
-Hai error correction terms (ECT) được biểu diễn như sau:
+[Chạy lại pipeline để cập nhật] — Các error correction terms (ECT) sẽ được
+biểu diễn dựa trên hệ 3 biến mới. Dạng kỳ vọng (phụ thuộc vào kết quả
+ước lượng thực tế):
 
-$$ECT_1 = \text{OEE}_t + 0.0631 \times \text{Volume}_t \approx 0 \tag{4.1}$$
+$$ECT_1 = f(\text{ProductionVolume}_t, \text{DelayRate}_t, \text{OrderDemand}_t) \approx 0 \tag{4.1}$$
 
-$$ECT_2 = \text{Delay}_t - 0.0437 \times \text{Volume}_t \approx 0 \tag{4.2}$$
+$$ECT_2 = g(\text{ProductionVolume}_t, \text{DelayRate}_t, \text{OrderDemand}_t) \approx 0 \tag{4.2}$$
+
+*Ghi chú: Số phương trình CE phụ thuộc vào hạng đồng tích hợp $r$.*
 
 ### 4.3.4. Diễn giải kinh tế
 
-**Phương trình (4.1) — Hiệu ứng quá tải công suất (Capacity Overload Effect):**
-Trong dài hạn, khi khối lượng đơn hàng (Volume) tăng 1 đơn vị, OEE Score giảm
-0.063 đơn vị. Hệ số dương $+0.0631$ trong $\beta_1$ đồng nghĩa với mối quan hệ
-nghịch biến: Volume cao → OEE thấp. Điều này phản ánh thực tế sản xuất — khi
-nhà máy hoạt động gần ngưỡng công suất tối đa, hiệu suất tổng thể thiết bị
-giảm do tăng thời gian chuyển đổi (changeover), bảo trì không kịp lịch, và
-tỷ lệ phế phẩm tăng.
+Chuỗi nhân quả kỳ vọng trong hệ 3 biến mới:
 
-**Phương trình (4.2) — Hiệu ứng quá tải giao hàng (Delivery Overload Effect):**
-Trong dài hạn, khi Volume tăng 1 đơn vị, Delay Rate tăng 0.044 đơn vị. Hệ số
-âm $-0.0437$ trong $\beta_2$ tạo ra mối quan hệ đồng biến: Volume cao → Delay
-cao. Bản chất kinh tế: khối lượng đơn hàng vượt năng lực giao hàng dẫn đến
-tắc nghẽn logistics, kéo dài lead time và tăng tỷ lệ giao trễ.
+$$\text{OrderDemand} \xrightarrow{\text{áp lực cầu}} \text{ProductionVolume} \xrightarrow{\text{quá tải}} \text{DelayRate}$$
 
-**Revenue** gần như không xuất hiện trong cả hai phương trình cân bằng
-($|\beta| < 10^{-10}$), cho thấy doanh thu không tham gia trực tiếp vào quan hệ
-cân bằng dài hạn mà phản ứng gián tiếp thông qua kênh Volume → OEE/Delay.
+**Hiệu ứng áp lực cầu lên sản lượng (Demand-Production Effect):**
+Trong dài hạn, khi áp lực đơn hàng (OrderDemand — tổng Quantity từ Sales Order)
+tăng, sản lượng thực tế (ProductionVolume — tổng ValuedQty từ NAV Value Entry)
+phải tăng theo để đáp ứng cầu. Quan hệ này phản ánh cơ chế truyền dẫn: cầu thị
+trường là tín hiệu ngoại sinh kích hoạt quyết định sản xuất.
+
+**Hiệu ứng quá tải giao hàng (Production-Delivery Overload Effect):**
+Khi ProductionVolume tăng cao (nhà máy hoạt động gần ngưỡng công suất), tỷ lệ
+giao hàng trễ (DelayRate) tăng do tắc nghẽn logistics, thời gian chuyển đổi
+(changeover) dài hơn, và lịch giao hàng bị dồn nén. Đây là hiệu ứng quá tải
+tương tự như trong hệ thống cũ (OEE → Delay ở phiên bản 4 biến), nhưng giờ
+được đo lường trực tiếp qua sản lượng thay vì hiệu suất thiết bị.
+
+[Chạy lại pipeline để cập nhật] — Hệ số $\beta$ cụ thể và mức ý nghĩa thống
+kê sẽ được xác định sau khi chạy lại pipeline với dữ liệu 3 biến mới.
 
 ---
 
@@ -192,22 +193,23 @@ cân bằng dài hạn mà phản ứng gián tiếp thông qua kênh Volume →
 
 | Biến | $\alpha_1$ (← ECT₁) | z-stat | p-value | $\alpha_2$ (← ECT₂) | z-stat | p-value |
 |------|:--------------------:|:------:|:-------:|:--------------------:|:------:|:-------:|
-| OEE Score | −0.0080 | −5.05 | <0.001*** | −0.0063 | −3.71 | <0.001*** |
-| Delay Rate | −0.6082 | −12.36 | <0.001*** | −0.9743 | −18.44 | <0.001*** |
-| Revenue | −4.30×10⁶ | −1.94 | 0.053 | −7.32×10⁶ | −3.07 | 0.002** |
-| Order Volume | −9.919 | −9.68 | <0.001*** | +1.731 | +1.57 | 0.116 |
+| ProductionVolume | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+| DelayRate | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+| OrderDemand | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+
+*Ghi chú: Số cột $\alpha$ phụ thuộc vào hạng đồng tích hợp $r$. Bảng trên giả định $r = 2$; nếu $r = 1$ thì chỉ có cột $\alpha_1$.*
 
 ### 4.4.2. Phương trình hệ thống VECM hoàn chỉnh
 
-Hệ thống VECM 4 phương trình (với $k_{ar\_diff} = 0$, không có $\Gamma$ terms):
+Hệ thống VECM 3 phương trình — [Chạy lại pipeline để cập nhật]:
 
-$$\Delta \text{OEE}_t = -0.0080 \cdot ECT_{1,t-1} - 0.0063 \cdot ECT_{2,t-1} + 0.0106 + u_{1t} \tag{4.3a}$$
+$$\Delta \text{ProductionVolume}_t = \alpha_{11} \cdot ECT_{1,t-1} + [\alpha_{12} \cdot ECT_{2,t-1}] + \mu_1 + u_{1t} \tag{4.3a}$$
 
-$$\Delta \text{Delay}_t = -0.6082 \cdot ECT_{1,t-1} - 0.9743 \cdot ECT_{2,t-1} + 0.7152 + u_{2t} \tag{4.3b}$$
+$$\Delta \text{DelayRate}_t = \alpha_{21} \cdot ECT_{1,t-1} + [\alpha_{22} \cdot ECT_{2,t-1}] + \mu_2 + u_{2t} \tag{4.3b}$$
 
-$$\Delta \text{Revenue}_t = -4.30 \times 10^6 \cdot ECT_{1,t-1} - 7.32 \times 10^6 \cdot ECT_{2,t-1} + 5.79 \times 10^6 + u_{3t} \tag{4.3c}$$
+$$\Delta \text{OrderDemand}_t = \alpha_{31} \cdot ECT_{1,t-1} + [\alpha_{32} \cdot ECT_{2,t-1}] + \mu_3 + u_{3t} \tag{4.3c}$$
 
-$$\Delta \text{Volume}_t = -9.919 \cdot ECT_{1,t-1} + 1.731 \cdot ECT_{2,t-1} + 13.664 + u_{4t} \tag{4.3d}$$
+*Ghi chú: Các hệ số $\alpha_{ij}$ và $\mu_i$ sẽ được cập nhật sau khi chạy pipeline. Số lượng ECT phụ thuộc vào $r$.*
 
 ### 4.4.3. Phân tích tốc độ hội tụ
 
@@ -215,36 +217,37 @@ $$\Delta \text{Volume}_t = -9.919 \cdot ECT_{1,t-1} + 1.731 \cdot ECT_{2,t-1} + 
 
 | Biến ← ECT | Half-life | Ý nghĩa kinh tế |
 |-------------|:---------:|------------------|
-| Delay Rate ← ECT₁ | **0.7 tuần** | Phản hồi cực nhanh — hệ thống logistics tự điều chỉnh gần như tức thời |
-| Delay Rate ← ECT₂ | **0.2 tuần** | Gần tức thời — delay "hấp thụ" shock delivery overload trong vòng 1–2 ngày |
-| OEE Score ← ECT₁ | **86.2 tuần** | Gần weakly exogenous — OEE thay đổi rất chậm, phản ánh năng lực nền tảng |
-| OEE Score ← ECT₂ | **109.3 tuần** | Weakly exogenous — OEE hầu như không phản ứng với ECT₂ |
-| Order Volume ← ECT₁ | **< 0.1 tuần** | Điều chỉnh tức thời — thị trường phản ứng ngay |
+| ProductionVolume ← ECT₁ | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+| DelayRate ← ECT₁ | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+| OrderDemand ← ECT₁ | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
 
-*Ghi chú: Half-life = $\ln(0.5) / \ln(1 + \alpha_i)$. Công thức áp dụng cho $\alpha_i < 0$ (error-correcting).*
+*Ghi chú: Half-life = $\ln(0.5) / \ln(1 + \alpha_i)$. Công thức áp dụng cho $\alpha_i < 0$ (error-correcting). Số dòng có thể tăng nếu $r > 1$.*
 
 ### 4.4.4. Diễn giải kinh tế
 
-**Bất đối xứng tốc độ điều chỉnh ($\alpha$ asymmetry):** Kết quả bộc lộ cấu trúc
-phân vai rõ ràng trong hệ thống quản trị sản xuất:
+**Bất đối xứng tốc độ điều chỉnh ($\alpha$ asymmetry):** [Chạy lại pipeline để
+cập nhật] — Kết quả kỳ vọng sẽ bộc lộ cấu trúc phân vai trong hệ thống quản
+trị sản xuất theo chuỗi nhân quả OrderDemand → ProductionVolume → DelayRate:
 
-1. **Delay Rate là fast responder** ($|\alpha| \approx 0.6 \text{–} 0.97$, half-life < 1 tuần):
-   Khi hệ thống lệch khỏi cân bằng — ví dụ OEE giảm đột ngột hoặc Volume tăng
-   vọt — tỷ lệ giao hàng trễ phản ứng gần như tức thời. Điều này phù hợp với
-   thực tế vận hành: delay là triệu chứng (symptom) xuất hiện ngay khi hệ thống
-   quá tải, không có độ trễ đáng kể.
+1. **OrderDemand là biến ngoại sinh (exogenous driver):**
+   Trong chuỗi nhân quả mới, áp lực cầu từ đơn hàng (OrderDemand) đóng vai trò
+   tín hiệu ngoại sinh kích hoạt toàn bộ hệ thống. Nếu $|\alpha|$ của OrderDemand
+   nhỏ (half-life dài), điều này xác nhận vai trò weakly exogenous — OrderDemand
+   tác động lên các biến khác nhưng bản thân ít bị ảnh hưởng bởi cân bằng nội bộ
+   hệ thống sản xuất.
 
-2. **OEE Score là causal driver** ($|\alpha| \approx 0.008$, half-life ~86 tuần):
-   OEE gần như weakly exogenous — nó tác động lên các biến khác nhưng bản thân
-   rất chậm thay đổi. Đây là bằng chứng thống kê rằng OEE đóng vai trò biến
-   nhân quả (causal driver), không phải biến phản ứng (endogenous responder).
-   Ý nghĩa quản trị: cải thiện OEE đòi hỏi can thiệp cấu trúc (đầu tư thiết bị,
-   đào tạo, tối ưu quy trình) — không thể "tự điều chỉnh" qua cơ chế thị trường.
+2. **DelayRate là fast responder:**
+   Kỳ vọng DelayRate vẫn giữ vai trò biến phản ứng nhanh nhất — khi hệ thống
+   lệch khỏi cân bằng (ví dụ ProductionVolume tăng vọt do OrderDemand cao),
+   tỷ lệ giao hàng trễ phản ứng gần như tức thời. Delay là triệu chứng (symptom)
+   xuất hiện ngay khi hệ thống quá tải.
 
-3. **Order Volume là amplifier đối với ECT₂** ($\alpha_2 = +1.731$, p=0.116):
-   Hệ số dương (dù chưa đạt ý nghĩa thống kê tại 5%) gợi ý rằng khi Delay Rate
-   vượt cân bằng, Volume không giảm mà có xu hướng duy trì — phản ánh hiệu ứng
-   "khách hàng chấp nhận trễ" trong ngắn hạn khi cầu cao.
+3. **ProductionVolume là biến trung gian (mediator):**
+   ProductionVolume (tổng ValuedQty từ NAV Value Entry) thay thế vai trò của OEE
+   trong hệ thống cũ, nhưng với ý nghĩa khác: thay vì đo hiệu suất thiết bị,
+   ProductionVolume đo lường sản lượng thực tế — là kết quả trực tiếp của áp lực
+   cầu (OrderDemand) và đồng thời là nguyên nhân trực tiếp gây quá tải giao hàng
+   (DelayRate).
 
 ---
 
@@ -256,43 +259,36 @@ Nghiên cứu thực hiện đồng thời hai kiểm định nhân quả để 
 quả — Granger causality trên chuỗi sai phân (Phase 2) và Toda-Yamamoto trên
 chuỗi mức gốc (Phase 3b):
 
-**Bảng 4.7: So sánh Granger Causality vs. Toda-Yamamoto (12 cặp biến)**
+**Bảng 4.7: So sánh Granger Causality vs. Toda-Yamamoto (6 cặp biến)**
 
 | Cặp nhân quả | Granger (sai phân) | Toda-Yamamoto (levels) | Đồng thuận? |
 |---------------|:------------------:|:----------------------:|:-----------:|
-| OEE → Delay Rate | p=0.082 | p<0.001*** (W=32.2) | Không |
-| OEE → Revenue | p=0.739 | p=0.003** (W=11.3) | Không |
-| OEE → Order Volume | p=0.167 | p<0.001*** (W=13.8) | Không |
-| **Delay Rate → OEE** | **p=0.003\*\*** | **p=0.009\*\*** | **Có** |
-| Delay Rate → Revenue | p=0.052 | p=0.006** (W=10.3) | Không |
-| Delay Rate → Order Volume | p=0.646 | p=0.681 | Có |
-| Revenue → OEE | p=0.848 | p=0.534 | Có |
-| Revenue → Delay Rate | p=0.996 | p<0.001*** (W=14.1) | Không |
-| Revenue → Order Volume | p=0.246 | p=0.121 | Có |
-| **Order Volume → OEE** | **p=0.008\*\*** | **p=0.007\*\*** | **Có** |
-| Order Volume → Delay Rate | p=0.922 | p=0.030* (W=7.0) | Không |
-| Order Volume → Revenue | p=0.971 | p=0.079 | Có |
+| OrderDemand → ProductionVolume | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+| OrderDemand → DelayRate | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+| ProductionVolume → OrderDemand | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+| ProductionVolume → DelayRate | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+| DelayRate → OrderDemand | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+| DelayRate → ProductionVolume | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
 
-*Tỷ lệ đồng thuận: 6/12 cặp (50%).*
+*Tỷ lệ đồng thuận: [Chạy lại pipeline để cập nhật]. Hệ 3 biến tạo ra $3 \times 2 = 6$ cặp nhân quả có hướng.*
 
 ### 4.5.2. Giải thích sự khác biệt
 
-Sự bất đồng giữa hai phương pháp (6/12 cặp) không phải là yếu điểm — ngược lại,
-nó cung cấp thông tin bổ sung quan trọng:
+[Chạy lại pipeline để cập nhật] — Phân tích sự đồng thuận/bất đồng giữa hai
+phương pháp sẽ được cập nhật dựa trên kết quả 6 cặp biến mới.
 
 - **Granger trên sai phân** chỉ nắm bắt nhân quả **ngắn hạn** (short-run dynamics)
-  vì sai phân loại bỏ thông tin dài hạn. Chỉ 2/12 cặp có ý nghĩa: Delay Rate → OEE
-  và Order Volume → OEE.
+  vì sai phân loại bỏ thông tin dài hạn.
 
-- **Toda-Yamamoto trên levels** bảo toàn thông tin dài hạn, phát hiện 8/12 cặp có ý
-  nghĩa — bao gồm OEE → Delay Rate (p < 0.001, Wald = 32.2), cặp nhân quả
-  cốt lõi của phương pháp Hybrid Causal Forecasting.
+- **Toda-Yamamoto trên levels** bảo toàn thông tin dài hạn, có khả năng phát hiện
+  quan hệ nhân quả mà Granger trên sai phân bỏ sót.
 
-- **Kết quả OEE → Delay Rate** minh họa rõ nhất: Granger trên sai phân cho p=0.082
-  (marginal, không đạt 5%) trong khi Toda-Yamamoto trên levels cho p < 0.0001
-  (rất mạnh). Điều này cho thấy tác động nhân quả OEE → Delay Rate chủ yếu
-  hoạt động qua **kênh dài hạn** (error correction mechanism) — chính xác là
-  cơ chế mà VECM mô hình hóa.
+- **Cặp nhân quả cốt lõi kỳ vọng:** OrderDemand → ProductionVolume và
+  ProductionVolume → DelayRate — đây là hai mắt xích chính trong chuỗi nhân quả
+  của phương pháp Hybrid Causal Forecasting. Nếu Toda-Yamamoto xác nhận hai cặp
+  này có ý nghĩa thống kê trên levels trong khi Granger trên sai phân yếu hơn,
+  điều đó cho thấy tác động nhân quả chủ yếu hoạt động qua **kênh dài hạn**
+  (error correction mechanism) — chính xác là cơ chế mà VECM mô hình hóa.
 
 ---
 
@@ -307,68 +303,62 @@ tính toán dựa trên phân rã Cholesky của ma trận hiệp phương sai i
 
 **Cholesky ordering** (ngoại sinh → nội sinh):
 
-$$\text{Order Volume} \rightarrow \text{OEE Score} \rightarrow \text{Revenue} \rightarrow \text{Delay Rate}$$
+$$\text{OrderDemand} \rightarrow \text{ProductionVolume} \rightarrow \text{DelayRate}$$
 
-Thứ tự này được xác lập dựa trên kết quả half-life từ ma trận $\alpha$: biến có
-half-life dài hơn (ngoại sinh hơn, chậm điều chỉnh) đứng trước, biến có
-half-life ngắn (nội sinh, fast responder) đứng sau. Khoảng mô phỏng: 12 tuần.
+Thứ tự này phản ánh chuỗi nhân quả kinh tế: OrderDemand (áp lực cầu từ đơn hàng)
+là biến ngoại sinh nhất — quyết định bởi thị trường, ít bị ảnh hưởng bởi nội bộ
+sản xuất. ProductionVolume (sản lượng thực tế) phản ứng theo cầu nhưng đồng thời
+là nguyên nhân gây quá tải. DelayRate (tỷ lệ giao trễ) là biến nội sinh nhất —
+triệu chứng cuối cùng của chuỗi truyền dẫn. Khoảng mô phỏng: 12 tuần.
 
-### 4.6.2. Kết quả IRF — Phản ứng của Delay Rate
+### 4.6.2. Kết quả IRF — Phản ứng của DelayRate
 
-![Hình 4.1: Hàm phản ứng xung — Phản ứng của Delay Rate đối với shock từ OEE Score và Order Volume](../../data/processed/figures/irf_delayrate_response.png)
+![Hình 4.1: Hàm phản ứng xung — Phản ứng của DelayRate đối với shock từ ProductionVolume và OrderDemand](../../data/processed/figures/irf_delayrate_response.png)
 
-*Hình 4.1: Orthogonalized IRF — phản ứng của Delay Rate khi có cú sốc 1 độ lệch chuẩn từ OEE Score (trái) và Order Volume (phải). Vùng tô: khoảng tin cậy 95% (asymptotic SE). Cholesky ordering: OrderVolume → OEE → Revenue → DelayRate.*
+*Hình 4.1: Orthogonalized IRF — phản ứng của DelayRate khi có cú sốc 1 độ lệch chuẩn từ ProductionVolume (trái) và OrderDemand (phải). Vùng tô: khoảng tin cậy 95% (asymptotic SE). Cholesky ordering: OrderDemand → ProductionVolume → DelayRate.*
 
-**Bảng 4.8: IRF — Phản ứng của Delay Rate tại các mốc thời gian**
+**Bảng 4.8: IRF — Phản ứng của DelayRate tại các mốc thời gian**
 
-| Tuần | OEE shock → Delay Rate | SE | Order Volume shock → Delay Rate | SE |
-|:----:|:----------------------:|:--:|:-------------------------------:|:--:|
-| 0 | **−0.0443** | 0.0159 | +0.0144 | 0.1203 |
-| 1 | −0.0050 | 0.0061 | +0.0167 | 0.0106 |
-| 4 | −0.0045 | 0.0006 | +0.0018 | 0.0034 |
-| 8 | −0.0045 | 0.0004 | +0.0013 | 0.0033 |
-| 12 | −0.0045 | 0.0004 | +0.0013 | 0.0033 |
+| Tuần | ProductionVolume shock → DelayRate | SE | OrderDemand shock → DelayRate | SE |
+|:----:|:---------------------------------:|:--:|:----------------------------:|:--:|
+| 0 | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+| 1 | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+| 4 | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+| 8 | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
+| 12 | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] | [Chạy lại pipeline để cập nhật] |
 
-**Diễn giải:** Khi OEE Score chịu một cú sốc cấu trúc dương 1 độ lệch chuẩn
-(tương đương cải thiện hiệu suất tổng thể thiết bị), tỷ lệ giao hàng trễ
-(Delay Rate) giảm ngay lập tức −0.044 đơn vị tại tuần 0 và hội tụ nhanh về
-mức dài hạn −0.0045 từ tuần thứ 3 trở đi. Toàn bộ đường phản ứng nằm hoàn
-toàn dưới trục zero với khoảng tin cậy 95% không chứa giá trị dương, xác nhận
-rằng tác động nhân quả OEE → Delay Rate có ý nghĩa thống kê và mang tính bền
-vững (persistent effect). Hình dạng phản ứng — shock mạnh ban đầu rồi phẳng
-dần — phản ánh cơ chế hiệu chỉnh sai số (error correction): khi hiệu suất
-sản xuất cải thiện, hệ thống logistics hấp thụ tác động trong vòng 2–3 tuần
-nhờ tốc độ điều chỉnh $\alpha$ nhanh của Delay Rate (half-life ≈ 0.7 tuần).
-Ngược lại, shock từ Order Volume tuy có chiều hướng dương (tăng volume → tăng
-delay), nhưng khoảng tin cậy rộng bao trùm trục zero, cho thấy tác động này
-không đủ ý nghĩa thống kê — khối lượng đơn hàng ảnh hưởng gián tiếp qua kênh
-OEE hơn là tác động trực tiếp lên tỷ lệ trễ hẹn.
+**Diễn giải:** [Chạy lại pipeline để cập nhật] — Kỳ vọng: khi ProductionVolume
+chịu cú sốc cấu trúc dương 1 độ lệch chuẩn (tương đương tăng sản lượng thực tế),
+DelayRate sẽ tăng do hiệu ứng quá tải — sản lượng cao dẫn đến tắc nghẽn logistics
+và tăng tỷ lệ giao trễ. Hình dạng phản ứng kỳ vọng — shock mạnh ban đầu rồi
+phẳng dần — phản ánh cơ chế hiệu chỉnh sai số (error correction). Đối với shock
+từ OrderDemand, tác động lên DelayRate có thể gián tiếp qua kênh ProductionVolume
+hoặc trực tiếp (nếu áp lực cầu cao vượt năng lực giao hàng ngay cả khi sản lượng
+chưa kịp tăng).
 
 ### 4.6.3. Kết quả FEVD — Phân rã phương sai Delay Rate
 
 ![Hình 4.2: Phân rã phương sai sai số dự báo — Delay Rate](../../data/processed/figures/fevd_delayrate_decomposition.png)
 
-*Hình 4.2: Forecast Error Variance Decomposition (FEVD) cho Delay Rate qua 12 tuần. Stacked area chart thể hiện tỷ lệ đóng góp từ mỗi nguồn shock cấu trúc. Cholesky ordering: OrderVolume → OEE → Revenue → DelayRate.*
+*Hình 4.2: Forecast Error Variance Decomposition (FEVD) cho Delay Rate qua 12 tuần. Stacked area chart thể hiện tỷ lệ đóng góp từ mỗi nguồn shock cấu trúc. Cholesky ordering: OrderDemand → ProductionVolume → DelayRate.*
 
 **Bảng 4.9: FEVD — Tỷ lệ đóng góp vào phương sai Delay Rate (%)**
 
-| Tầm dự báo | Delay Rate | OEE Score | Order Volume | Revenue |
-|:-----------:|:----------:|:---------:|:------------:|:-------:|
-| Tuần 1 | 93.6% | 5.8% | 0.6% | 0.0% |
-| Tuần 4 | 92.5% | 5.9% | 1.6% | 0.0% |
-| Tuần 8 | 92.3% | 6.1% | 1.6% | 0.1% |
-| Tuần 12 | 92.0% | **6.3%** | 1.6% | 0.1% |
+| Tầm dự báo | Delay Rate | Production Volume | Order Demand |
+|:-----------:|:----------:|:-----------------:|:------------:|
+| Tuần 1 | _[chạy lại]_ | _[chạy lại]_ | _[chạy lại]_ |
+| Tuần 4 | _[chạy lại]_ | _[chạy lại]_ | _[chạy lại]_ |
+| Tuần 8 | _[chạy lại]_ | _[chạy lại]_ | _[chạy lại]_ |
+| Tuần 12 | _[chạy lại]_ | _[chạy lại]_ | _[chạy lại]_ |
 
-**Diễn giải:** Kết quả FEVD bổ sung bằng chứng định lượng cho vai trò nhân quả
-của OEE Score trong hệ thống quản trị sản xuất. Tại tầm dự báo 1 tuần, 93.6%
-phương sai sai số dự báo của Delay Rate được giải thích bởi chính nó — phù hợp
-với đặc tính inertia ngắn hạn của chuỗi thời gian. Tuy nhiên, khi mở rộng tầm
-dự báo, tỷ phần đóng góp của OEE Score tăng dần từ 5.8% (tuần 1) lên 6.3%
-(tuần 12), trong khi Order Volume đóng góp ổn định khoảng 1.6%. Xu hướng tăng
-dần này — dù khiêm tốn về giá trị tuyệt đối — mang ý nghĩa phương pháp luận
-quan trọng: nó chứng minh rằng hiệu suất sản xuất (OEE) không chỉ là biến tương
-quan mà còn chứa thông tin dự báo bổ sung (incremental predictive information) mà
-mô hình đơn biến ARIMA hoặc VAR thuần túy không thể khai thác.
+**Diễn giải:** _[Chạy lại pipeline để cập nhật]_ — Kỳ vọng: kết quả FEVD sẽ
+cho thấy vai trò nhân quả của ProductionVolume và OrderDemand trong việc giải
+thích phương sai sai số dự báo của Delay Rate. Tại tầm dự báo ngắn, phần lớn
+phương sai được giải thích bởi chính Delay Rate (inertia ngắn hạn). Khi mở rộng
+tầm dự báo, kỳ vọng tỷ phần đóng góp của ProductionVolume và OrderDemand tăng
+dần — chứng minh rằng sản lượng và nhu cầu đặt hàng chứa thông tin dự báo bổ
+sung (incremental predictive information) mà mô hình đơn biến ARIMA không thể
+khai thác.
 
 ---
 
@@ -378,14 +368,14 @@ mô hình đơn biến ARIMA hoặc VAR thuần túy không thể khai thác.
 
 **Bảng 4.10: Dự báo VECM 4 tuần (T+1 đến T+4) với khoảng tin cậy 95%**
 
-| Tuần | OEE Score | Delay Rate | Revenue (VNĐ) | Order Volume |
-|:----:|:---------:|:----------:|:-------------:|:------------:|
-| 2026-01-12 (T+1) | 0.947 [0.936, 0.959] | 0.315 [−0.047, 0.677] | 738.0M [721.7M, 754.3M] | 8.8 [1.3, 16.4] |
-| 2026-01-19 (T+2) | 0.948 [0.931, 0.965] | 0.318 [−0.045, 0.682] | 738.8M [715.6M, 762.0M] | 9.1 [1.2, 17.0] |
-| 2026-01-26 (T+3) | 0.948 [0.927, 0.970] | 0.319 [−0.044, 0.683] | 739.6M [711.1M, 768.1M] | 9.2 [1.2, 17.1] |
-| 2026-02-02 (T+4) | 0.949 [0.924, 0.974] | 0.320 [−0.044, 0.684] | 740.4M [707.5M, 773.3M] | 9.2 [1.3, 17.2] |
+| Tuần | Production Volume | Delay Rate | Order Demand |
+|:----:|:-----------------:|:----------:|:------------:|
+| T+1 | _[chạy lại pipeline]_ | _[chạy lại pipeline]_ | _[chạy lại pipeline]_ |
+| T+2 | _[chạy lại pipeline]_ | _[chạy lại pipeline]_ | _[chạy lại pipeline]_ |
+| T+3 | _[chạy lại pipeline]_ | _[chạy lại pipeline]_ | _[chạy lại pipeline]_ |
+| T+4 | _[chạy lại pipeline]_ | _[chạy lại pipeline]_ | _[chạy lại pipeline]_ |
 
-*Ghi chú: CI = 95% confidence interval dựa trên IRF/MA representation (Lütkepohl, 2005, Mục 6.5). Revenue làm tròn đến triệu VNĐ.*
+*Ghi chú: CI = 95% confidence interval dựa trên IRF/MA representation (Lütkepohl, 2005, Mục 6.5).*
 
 ### 4.7.2. Chẩn đoán mô hình
 
@@ -393,12 +383,12 @@ mô hình đơn biến ARIMA hoặc VAR thuần túy không thể khai thác.
 
 | Chỉ số | Giá trị |
 |--------|:-------:|
-| Log-Likelihood | −6,017.33 |
-| AIC | 12,058.65 |
-| BIC | 12,105.74 |
-| Quan sát hiệu dụng | 374 |
-| Bậc tự do/phương trình | 371 |
-| Tổng tham số | 12 |
+| Log-Likelihood | _[chạy lại pipeline]_ |
+| AIC | _[chạy lại pipeline]_ |
+| BIC | _[chạy lại pipeline]_ |
+| Quan sát hiệu dụng | _[chạy lại pipeline]_ |
+| Bậc tự do/phương trình | _[chạy lại pipeline]_ |
+| Tổng tham số | _[chạy lại pipeline — 3 biến]_ |
 
 ### 4.7.3. So sánh VECM với mô hình đơn biến
 
@@ -409,29 +399,28 @@ thời gian thuần túy (ARIMA, VAR) được thể hiện qua bốn trụ cộ
 
 | Trụ cột | Bằng chứng từ dữ liệu | Mô hình thuần thống kê thiếu gì? |
 |---------|------------------------|----------------------------------|
-| 1. Đồng tích hợp | $r = 2$, Trace stat = 496.9 >> CV 55.2 | ARIMA bỏ qua quan hệ dài hạn giữa các biến; VAR trên sai phân mất thông tin levels |
-| 2. Nhân quả Toda-Yamamoto | OEE → Delay: p < 0.001 (Wald = 32.2) | VAR không phân biệt hướng nhân quả — coi mọi biến như đối xứng |
-| 3. Bất đối xứng $\alpha$ | OEE: half-life 86 tuần (driver) vs. Delay: 0.7 tuần (responder) | ARIMA không có error correction mechanism — không mô hình hóa tốc độ hội tụ |
-| 4. FEVD | OEE giải thích 6.3% variance Delay Rate tại h=12, tăng dần theo tầm | Forecast ARIMA không tận dụng incremental predictive information từ biến nhân quả |
+| 1. Đồng tích hợp | $r$ = _[chạy lại pipeline]_ | ARIMA bỏ qua quan hệ dài hạn giữa các biến; VAR trên sai phân mất thông tin levels |
+| 2. Nhân quả Toda-Yamamoto | _[chạy lại — kỳ vọng: OrderDemand → ProductionVolume → Delay]_ | VAR không phân biệt hướng nhân quả — coi mọi biến như đối xứng |
+| 3. Bất đối xứng $\alpha$ | _[chạy lại — kỳ vọng: bất đối xứng driver vs. responder]_ | ARIMA không có error correction mechanism — không mô hình hóa tốc độ hội tụ |
+| 4. FEVD | _[chạy lại — kỳ vọng: ProductionVolume giải thích phần variance DelayRate]_ | Forecast ARIMA không tận dụng incremental predictive information từ biến nhân quả |
 
 ### 4.7.4. Hàm ý quản trị
 
 Kết quả phân tích VECM gợi ý các hàm ý quản trị sản xuất sau:
 
-1. **OEE là đòn bẩy chiến lược:** Với vai trò causal driver (half-life ~86 tuần,
-   gần weakly exogenous), cải thiện OEE Score không chỉ nâng hiệu suất sản xuất
-   mà còn giảm Delay Rate trong dài hạn (−0.044 đơn vị cho mỗi 1 SD cải thiện).
-   Tuy nhiên, hiệu quả đòi hỏi kiên nhẫn — tác động cần 2–3 tuần để hệ thống
-   logistics hấp thụ hoàn toàn.
+1. **OrderDemand là tín hiệu ngoại sinh:** Nhu cầu đặt hàng (từ Sales Order) là
+   biến ngoại sinh nhất trong chuỗi — phản ánh áp lực thị trường mà nhà máy phải
+   đáp ứng. Giám sát xu hướng OrderDemand cho phép dự báo sớm áp lực lên sản xuất
+   và logistics.
 
-2. **Delay Rate là chỉ báo sớm:** Với tốc độ phản ứng cực nhanh (half-life < 1 tuần),
-   sự gia tăng đột ngột của Delay Rate là tín hiệu cảnh báo sớm rằng hệ thống đang
-   lệch khỏi cân bằng — có thể do OEE suy giảm hoặc Volume vượt ngưỡng năng lực.
+2. **Delay Rate là chỉ báo sớm:** Với tốc độ phản ứng nhanh, sự gia tăng đột ngột
+   của Delay Rate là tín hiệu cảnh báo sớm rằng hệ thống đang lệch khỏi cân bằng
+   — có thể do sản lượng vượt ngưỡng năng lực hoặc áp lực cầu tăng đột biến.
 
-3. **Ngưỡng Volume tối ưu:** Phương trình (4.1) cho phép ước lượng ngưỡng Volume
-   mà tại đó OEE bắt đầu suy giảm đáng kể: với mỗi đơn vị Volume tăng thêm,
-   OEE giảm 0.063 đơn vị. Doanh nghiệp có thể sử dụng ngưỡng này để cân nhắc
-   giữa việc nhận thêm đơn hàng và duy trì chất lượng giao hàng.
+3. **Ngưỡng sản lượng tối ưu:** Phương trình đồng tích hợp cho phép ước lượng
+   ngưỡng ProductionVolume mà tại đó DelayRate bắt đầu tăng đáng kể. Doanh nghiệp
+   có thể sử dụng ngưỡng này để cân nhắc giữa việc nhận thêm đơn hàng và duy trì
+   chất lượng giao hàng. _[Hệ số cụ thể: chạy lại pipeline]_
 
 4. **Hệ thống cảnh báo dựa trên ECT:** Error correction terms (ECT₁, ECT₂) có
    thể được giám sát theo thời gian thực. Khi $|ECT| > \theta$ (ngưỡng cảnh báo),
@@ -447,7 +436,7 @@ Kết quả phân tích VECM gợi ý các hàm ý quản trị sản xuất sau
 
 Khoảng tin cậy dự báo VECM (Bảng 4.10) được tính dựa trên biểu diễn MA
 (Moving Average) của sai số dự báo (Lütkepohl, 2005, Mục 6.5), đòi hỏi phân
-rã Cholesky ma trận hiệp phương sai innovation $\Sigma_u \in \mathbb{R}^{4 \times 4}$
+rã Cholesky ma trận hiệp phương sai innovation $\Sigma_u \in \mathbb{R}^{3 \times 3}$
 ước lượng từ phần dư VECM. Phân rã Cholesky yêu cầu $\Sigma_u$ phải xác định
 dương (positive definite), tức mọi eigenvalue $\lambda_i > 0$.
 
