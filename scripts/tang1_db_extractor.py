@@ -162,31 +162,38 @@ def _compute_sha256(file_path: str) -> str:
 
 def _compute_orderno_overlap(dataframes: dict[str, pd.DataFrame]) -> dict:
     """
-    Tính tỉ lệ khớp OrderNo giữa 3 file bằng Jaccard Index.
+    Tính tỉ lệ khớp OrderNo giữa các file cùng loại document number.
 
-    Mục đích: phát hiện sớm lệch dữ liệu do snapshot không đồng thời
-    (ARCHITECTURE_4_tang.md, Tầng 1, mục 4). Nếu tỉ lệ khớp < 95%,
-    Tầng 1 ghi WARNING (CLAUDE.md mục 7.3).
+    Phương án A: production_volume dùng Production Order No (từ Value Entry),
+    trong khi cmt_delay_results và order_demand dùng Sales Order No — hai
+    numbering series khác nhau nên KHÔNG THỂ so sánh chéo. Jaccard chỉ tính
+    giữa các file cùng dùng Sales Order No (cmt_delay_results + order_demand).
 
-    Công thức Jaccard: J(A,B,C) = |A ∩ B ∩ C| / |A ∪ B ∪ C|
-    (xem MATH_AND_ALGORITHMS.md, Tầng 1, mục 1.1)
+    Mục đích: phát hiện sớm lệch dữ liệu do snapshot không đồng thời.
+    Nếu tỉ lệ khớp < 50%, Tầng 1 ghi WARNING (CLAUDE.md mục 7.3).
+    Ngưỡng 50% (thay vì 95%) vì order_demand chứa cả đơn hàng chưa giao
+    (chưa có shipment) nên giao tập hợp tự nhiên < 100%.
     """
+    # Chỉ so sánh giữa các file dùng Sales Order No
+    sales_order_tables = ["cmt_delay_results", "order_demand"]
     sets = {}
-    for name, df in dataframes.items():
-        if "OrderNo" in df.columns:
-            sets[name] = set(df["OrderNo"].dropna().unique())
-        else:
-            # Nếu file không có cột OrderNo (vd: fob_revenue chỉ có dữ liệu
-            # tổng hợp theo tháng), bỏ qua file đó khi tính overlap.
-            logger.warning(
-                f"File {name} không có cột 'OrderNo' — bỏ qua khi tính "
-                f"tỉ lệ khớp OrderNo."
+    for name in sales_order_tables:
+        if name in dataframes and "OrderNo" in dataframes[name].columns:
+            sets[name] = set(dataframes[name]["OrderNo"].dropna().unique())
+
+    # Ghi log riêng cho production_volume (khác numbering series)
+    if "production_volume" in dataframes:
+        pv_df = dataframes["production_volume"]
+        if "OrderNo" in pv_df.columns:
+            pv_count = pv_df["OrderNo"].dropna().nunique()
+            logger.info(
+                f"production_volume có {pv_count:,} Production Order No riêng biệt "
+                f"(numbering series khác Sales Order — không so sánh Jaccard)."
             )
 
     if len(sets) < 2:
-        return {"overlap_ratio": None, "detail": "Không đủ file có cột OrderNo để so sánh."}
+        return {"overlap_ratio": None, "detail": "Không đủ file Sales Order để so sánh Jaccard."}
 
-    # Tính Jaccard index: |giao| / |hợp| của tất cả các tập có OrderNo
     all_sets = list(sets.values())
     intersection = all_sets[0]
     union = all_sets[0]
@@ -579,11 +586,11 @@ def extract_snapshot() -> str:
             ratio_pct = overlap_info["overlap_ratio"] * 100
             logger.info(f"Tỉ lệ khớp OrderNo (Jaccard): {ratio_pct:.2f}%")
 
-            if overlap_info["overlap_ratio"] < 0.95:
+            if overlap_info["overlap_ratio"] < 0.50:
                 logger.warning(
-                    f"Tỉ lệ khớp OrderNo giữa các file = {ratio_pct:.2f}% "
-                    f"(< 95%) — kiểm tra lại xem snapshot có đồng thời không, "
-                    f"hoặc có bảng ERP gốc nào thiếu dữ liệu OrderNo. "
+                    f"Tỉ lệ khớp OrderNo (Sales Order) giữa cmt_delay_results "
+                    f"và order_demand = {ratio_pct:.2f}% (< 50%) — kiểm tra "
+                    f"lại snapshot hoặc bảng ERP gốc. "
                     f"Chi tiết: giao={overlap_info['intersection_count']:,}, "
                     f"hợp={overlap_info['union_count']:,}."
                 )
