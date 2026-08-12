@@ -4,8 +4,8 @@ Tầng 2 — Phase 0: Tái cấu trúc & Đồng bộ hóa dữ liệu thô thà
 Mục đích:
     Đọc 3 file CSV nguyên trạng từ snapshot mới nhất trong `data/raw/`, thực hiện:
       (1) Đồng bộ trục thời gian — chống look-ahead bias bằng cách gán tuần theo
-          `ActualEndDate` (OEE, Delay) và `ShipmentDate` (Revenue) thay vì
-          `PlannedShipmentDate` (ARCHITECTURE_4_tang.md, mục 2.1).
+          `ActualEndDate` (OEE), `ActualShipDate` (Delay), và `PostingDate`
+          (Revenue) thay vì dùng ngày kế hoạch (ARCHITECTURE_4_tang.md, mục 2.1).
       (2) Tính trung bình tuần có trọng số — `np.average(OEE_Score, weights=RealQty)`
           phản ánh khối lượng sản xuất thực tế (ARCHITECTURE, mục 2.3).
       (3) Nội suy NaN có giới hạn — `interpolate(limit=2)` cho tỷ lệ (OEE,
@@ -296,11 +296,12 @@ def _aggregate_delay_weekly(delay_raw: pd.DataFrame) -> pd.DataFrame:
 
     Logic nghiệp vụ:
 
-    1. CHỐNG LOOK-AHEAD BIAS: Giống OEE, gán vào tuần theo `ActualEndDate`
-       (ngày hoàn thành thực) — vì `IsDelayed` chỉ xác định được SAU khi
-       đơn hàng hoàn thành (so sánh `ActualEndDate` vs `PlannedShipmentDate`).
+    1. CHỐNG LOOK-AHEAD BIAS: Gán vào tuần theo `ActualShipDate` (ngày giao
+       hàng thực tế từ Sales Order Header) — vì `IsDelayed` chỉ xác định
+       được SAU khi đơn hàng đã giao (so sánh `ActualShipDate` vs
+       `PlannedShipmentDate`).
 
-    2. LOẠI ĐƠN HÀNG CHƯA HOÀN THÀNH: Đơn hàng có `ActualEndDate` là NaT
+    2. LOẠI ĐƠN HÀNG CHƯA GIAO: Đơn hàng có `ActualShipDate` là NaT
        → chưa thể xác định trễ hay không → loại khỏi tính toán.
 
     3. DelayRate = số đơn trễ / tổng số đơn trong tuần (tỷ lệ đơn giản).
@@ -312,22 +313,22 @@ def _aggregate_delay_weekly(delay_raw: pd.DataFrame) -> pd.DataFrame:
     df = delay_raw.copy()
 
     # --- Ép kiểu cột thời gian ---
-    df["ActualEndDate"] = pd.to_datetime(df["ActualEndDate"], errors="coerce")
+    df["ActualShipDate"] = pd.to_datetime(df["ActualShipDate"], errors="coerce")
 
-    # --- Loại đơn hàng chưa hoàn thành ---
-    nat_count = df["ActualEndDate"].isna().sum()
+    # --- Loại đơn hàng chưa giao ---
+    nat_count = df["ActualShipDate"].isna().sum()
     if nat_count > 0:
         logger.warning(
-            f"[Delay] Loại {nat_count:,} đơn hàng chưa hoàn thành "
-            f"(ActualEndDate = NaT) — chưa thể xác định trễ hay không."
+            f"[Delay] Loại {nat_count:,} đơn hàng chưa giao "
+            f"(ActualShipDate = NaT) — chưa thể xác định trễ hay không."
         )
-    df = df.dropna(subset=["ActualEndDate"])
+    df = df.dropna(subset=["ActualShipDate"])
 
     # --- Giám sát bản ghi cận nửa đêm ---
-    _warn_midnight_boundary(df, "ActualEndDate", "Delay")
+    _warn_midnight_boundary(df, "ActualShipDate", "Delay")
 
-    # --- Gán tuần theo ActualEndDate ---
-    df["week_start"] = _to_week_start(df["ActualEndDate"])
+    # --- Gán tuần theo ActualShipDate ---
+    df["week_start"] = _to_week_start(df["ActualShipDate"])
 
     # --- Xử lý cột IsDelayed ---
     # Ép sang số: 1 = trễ, 0 = đúng hạn. Nếu cột chứa True/False hoặc
@@ -350,16 +351,16 @@ def _aggregate_delay_weekly(delay_raw: pd.DataFrame) -> pd.DataFrame:
         # chưa có sẵn trường IsDelayed dạng số.
         logger.info(
             "[Delay] Không tìm thấy cột 'IsDelayed' — tính tự động: "
-            "IsDelayed = 1 nếu ActualEndDate > PlannedShipmentDate."
+            "IsDelayed = 1 nếu ActualShipDate > PlannedShipmentDate."
         )
         df["PlannedShipmentDate"] = pd.to_datetime(
             df["PlannedShipmentDate"], errors="coerce"
         )
-        df["IsDelayed"] = (df["ActualEndDate"] > df["PlannedShipmentDate"]).astype(int)
+        df["IsDelayed"] = (df["ActualShipDate"] > df["PlannedShipmentDate"]).astype(int)
 
     # --- Loại dòng trùng OrderNo trong cùng 1 tuần ---
     before_dedup = len(df)
-    df = df.sort_values("ActualEndDate").drop_duplicates(
+    df = df.sort_values("ActualShipDate").drop_duplicates(
         subset=["OrderNo", "week_start"], keep="last"
     )
     dedup_dropped = before_dedup - len(df)
@@ -394,10 +395,11 @@ def _aggregate_revenue_weekly(revenue_raw: pd.DataFrame) -> pd.DataFrame:
 
     Logic nghiệp vụ:
 
-    1. MỐC THỜI GIAN: Dùng `ShipmentDate` (ngày giao hàng thực tế) — đây
-       là thời điểm doanh thu được ghi nhận. Khác với OEE/Delay dùng
-       `ActualEndDate`. Cả hai đều là "ngày biết được" — nhất quán về
-       triết lý point-in-time correctness (ARCHITECTURE, mục 2.1).
+    1. MỐC THỜI GIAN: Dùng `PostingDate` (ngày hạch toán) — đây là thời
+       điểm doanh thu được ghi nhận trong sổ cái. Khác với OEE dùng
+       `ActualEndDate`, Delay dùng `ActualShipDate`. Cả ba đều là "ngày
+       biết được" — nhất quán về triết lý point-in-time correctness
+       (ARCHITECTURE, mục 2.1).
 
     2. Revenue và OrderVolume là tổng/đếm — giá trị 0 có ý nghĩa thật
        ("không có giao dịch trong tuần đó"). Vì vậy khi nội suy sau này
@@ -406,22 +408,22 @@ def _aggregate_revenue_weekly(revenue_raw: pd.DataFrame) -> pd.DataFrame:
     df = revenue_raw.copy()
 
     # --- Ép kiểu cột thời gian ---
-    df["ShipmentDate"] = pd.to_datetime(df["ShipmentDate"], errors="coerce")
+    df["PostingDate"] = pd.to_datetime(df["PostingDate"], errors="coerce")
 
-    # Loại dòng không parse được ShipmentDate
-    nat_count = df["ShipmentDate"].isna().sum()
+    # Loại dòng không parse được PostingDate
+    nat_count = df["PostingDate"].isna().sum()
     if nat_count > 0:
         logger.warning(
-            f"[Revenue] Loại {nat_count:,} dòng có ShipmentDate không hợp lệ "
+            f"[Revenue] Loại {nat_count:,} dòng có PostingDate không hợp lệ "
             f"(NaT sau ép kiểu datetime)."
         )
-    df = df.dropna(subset=["ShipmentDate"])
+    df = df.dropna(subset=["PostingDate"])
 
     # --- Giám sát bản ghi cận nửa đêm ---
-    _warn_midnight_boundary(df, "ShipmentDate", "Revenue")
+    _warn_midnight_boundary(df, "PostingDate", "Revenue")
 
-    # --- Gán tuần theo ShipmentDate ---
-    df["week_start"] = _to_week_start(df["ShipmentDate"])
+    # --- Gán tuần theo PostingDate ---
+    df["week_start"] = _to_week_start(df["PostingDate"])
 
     # --- Ép kiểu cột Revenue ---
     # Tên cột Revenue có thể khác tùy database — Anh Béo xác nhận tên
