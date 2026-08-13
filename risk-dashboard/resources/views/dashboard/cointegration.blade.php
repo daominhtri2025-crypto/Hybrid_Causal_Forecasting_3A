@@ -73,7 +73,7 @@
         {{-- Route decision --}}
         <div class="rounded-xl p-6 border" id="route-decision" style="background-color: var(--color-bg-card); border-color: var(--color-border);"></div>
         {{-- Rank tests table --}}
-        <div class="rounded-xl border overflow-hidden" style="background-color: var(--color-bg-card); border-color: var(--color-border);">
+        <div id="coint-table-wrap" class="rounded-xl border overflow-hidden" style="background-color: var(--color-bg-card); border-color: var(--color-border);">
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
@@ -88,6 +88,8 @@
                 </table>
             </div>
         </div>
+        {{-- Shown when Johansen test was skipped --}}
+        <div id="coint-skipped" class="hidden rounded-xl p-5 border" style="background-color: var(--color-bg-card); border-color: var(--color-border);"></div>
     </div>
 </div>
 
@@ -134,22 +136,42 @@
         `;
 
         const tests = data.trace_test?.details ?? [];
-        document.getElementById('coint-tbody').innerHTML = tests.map(t => {
-            const cv95 = t.critical_values?.['95%'] ?? null;
-            const rejected = t.reject_h0_at_5pct ?? ((t.statistic ?? 0) > (cv95 ?? Infinity));
-            return `
-                <tr class="border-t" style="border-color: var(--color-border);">
-                    <td class="px-4 py-3 font-medium" style="color: var(--color-text-primary);">${t.h0 ?? '?'}</td>
-                    <td class="px-4 py-3 text-right tabular-nums" style="color: var(--color-text-primary);">${t.statistic?.toFixed(3) ?? '—'}</td>
-                    <td class="px-4 py-3 text-right tabular-nums" style="color: var(--color-text-secondary);">${cv95?.toFixed(3) ?? '—'}</td>
-                    <td class="px-4 py-3 text-center">
-                        ${rejected
-                            ? '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" style="background-color: rgba(239,68,68,0.15); color: var(--color-accent-red);">Reject</span>'
-                            : '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" style="background-color: rgba(34,197,94,0.15); color: var(--color-kpi-positive);">Fail to Reject</span>'}
-                    </td>
-                </tr>
+        if (tests.length === 0) {
+            document.getElementById('coint-table-wrap').classList.add('hidden');
+            const skipped = document.getElementById('coint-skipped');
+            skipped.classList.remove('hidden');
+            skipped.innerHTML = `
+                <div class="flex items-start gap-3">
+                    <svg class="h-5 w-5 shrink-0 mt-0.5" style="color: var(--color-accent-cyan);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <div>
+                        <p class="text-sm font-medium" style="color: var(--color-text-primary);">Bảng Trace test không có dữ liệu</p>
+                        <p class="mt-1 text-xs" style="color: var(--color-text-muted);">
+                            Tất cả biến đều dừng ở mức I(0) → full rank → pipeline bỏ qua kiểm định Johansen.
+                            Route được xác định trực tiếp từ kết quả Phase 1.
+                        </p>
+                    </div>
+                </div>
             `;
-        }).join('');
+        } else {
+            document.getElementById('coint-tbody').innerHTML = tests.map(t => {
+                const cv95 = t.critical_values?.['95%'] ?? null;
+                const rejected = t.reject_h0_at_5pct ?? ((t.statistic ?? 0) > (cv95 ?? Infinity));
+                return `
+                    <tr class="border-t" style="border-color: var(--color-border);">
+                        <td class="px-4 py-3 font-medium" style="color: var(--color-text-primary);">${t.h0 ?? '?'}</td>
+                        <td class="px-4 py-3 text-right tabular-nums" style="color: var(--color-text-primary);">${t.statistic?.toFixed(3) ?? '—'}</td>
+                        <td class="px-4 py-3 text-right tabular-nums" style="color: var(--color-text-secondary);">${cv95?.toFixed(3) ?? '—'}</td>
+                        <td class="px-4 py-3 text-center">
+                            ${rejected
+                                ? '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" style="background-color: rgba(239,68,68,0.15); color: var(--color-accent-red);">Reject</span>'
+                                : '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" style="background-color: rgba(34,197,94,0.15); color: var(--color-kpi-positive);">Fail to Reject</span>'}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
     }
 
     load();
