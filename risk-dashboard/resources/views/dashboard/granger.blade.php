@@ -118,7 +118,7 @@
     function renderSummary(data) {
         const items = [
             ['Significant Pairs', `${data.summary?.significant_count ?? '—'}/${data.summary?.total_pairs ?? '—'}`, 'var(--color-accent-blue)'],
-            ['Lag Order', data.metadata?.lag_order ?? '—', 'var(--color-accent-cyan)'],
+            ['Lag Order', data.lag_selection?.selected_lag ?? '—', 'var(--color-accent-cyan)'],
             ['Significance Level', data.metadata?.significance_level ?? 0.05, 'var(--color-accent-purple)'],
         ];
         document.getElementById('granger-summary').innerHTML = items.map(([label, val, color]) => `

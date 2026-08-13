@@ -23,11 +23,15 @@ class CointegrationController extends Controller
 
             $johansen = $raw['johansen_result'] ?? [];
             $traceTest = $johansen['trace_test'] ?? [];
-            $maxEigenTest = $johansen['max_eigen_test'] ?? [];
+            $maxEigenTest = $johansen['max_eigenvalue_test'] ?? $johansen['max_eigen_test'] ?? [];
 
-            // Route quyết định từ Phase 3
-            $rank = $traceTest['rank'] ?? $maxEigenTest['rank'] ?? null;
-            $nVariables = count($raw['metadata']['d_values_from_phase1'] ?? []);
+            // Route quyết định từ Phase 3 — thử nhiều nguồn fallback
+            $rank = $traceTest['rank']
+                ?? $maxEigenTest['rank']
+                ?? $johansen['coint_rank']
+                ?? null;
+            $nVariables = $johansen['n_variables']
+                ?? count($raw['metadata']['d_values_from_phase1'] ?? []);
 
             // Xác định route dựa trên rank
             $route = 'unknown';
@@ -37,10 +41,14 @@ class CointegrationController extends Controller
                 } elseif ($rank > 0 && $rank < $nVariables) {
                     $route = 'VECM';
                 } else {
-                    // rank == n (full rank) → không đồng tích hợp → VAR trên levels
                     $route = 'VAR_on_levels';
                 }
             }
+
+            // Ưu tiên route/explanation từ johansen_result (Python pipeline đã tính sẵn)
+            $finalRoute = $raw['model_route'] ?? $johansen['route'] ?? $route;
+            $finalExplanation = $johansen['route_explanation']
+                ?? $this->explainRoute($finalRoute, $rank, $nVariables);
 
             return response()->json([
                 'status' => 'ok',
@@ -49,10 +57,10 @@ class CointegrationController extends Controller
                     'lag_selection' => $raw['lag_selection'] ?? null,
                     'rank'        => $rank,
                     'n_variables' => $nVariables,
-                    'route'       => $raw['model_route'] ?? $route,
-                    'route_explanation' => $this->explainRoute($route, $rank, $nVariables),
-                    'trace_test'  => $traceTest,
-                    'max_eigen_test' => $maxEigenTest,
+                    'route'       => $finalRoute,
+                    'route_explanation' => $finalExplanation,
+                    'trace_test'  => is_array($traceTest) && isset($traceTest['details']) ? $traceTest : null,
+                    'max_eigen_test' => is_array($maxEigenTest) && isset($maxEigenTest['details']) ? $maxEigenTest : null,
                 ],
             ]);
         } catch (\RuntimeException $e) {
