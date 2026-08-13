@@ -134,18 +134,24 @@
     function renderTable(data) {
         const rows = data.table ?? [];
         const tbody = document.getElementById('station-tbody');
-        tbody.innerHTML = rows.map(r => `
+        tbody.innerHTML = rows.map(r => {
+            const adfDecision = r.adf_reject ? 'Reject H0' : 'Fail to Reject';
+            const kpssDecision = r.kpss_reject ? 'Reject H0' : 'Fail to Reject';
+            const levelLabel = r.integration_order != null ? `I(${r.integration_order})` : 'Level';
+
+            return `
             <tr class="border-t" style="border-color: var(--color-border);">
                 <td class="px-4 py-3 font-medium" style="color: var(--color-text-primary);">${r.variable}</td>
-                <td class="px-4 py-3 text-xs" style="color: var(--color-text-secondary);">${r.transform ?? 'Level'}</td>
-                <td class="px-4 py-3 text-right tabular-nums" style="color: var(--color-text-primary);">${r.adf_stat?.toFixed(3) ?? '—'}</td>
-                <td class="px-4 py-3 text-right tabular-nums" style="color: var(--color-text-primary);">${r.adf_pvalue?.toFixed(4) ?? '—'}</td>
-                <td class="px-4 py-3 text-center">${pBadge(r.adf_decision)}</td>
-                <td class="px-4 py-3 text-right tabular-nums" style="color: var(--color-text-primary);">${r.kpss_stat?.toFixed(3) ?? '—'}</td>
-                <td class="px-4 py-3 text-center">${pBadge(r.kpss_decision === 'Fail to Reject H0' ? 'Reject H0' : r.kpss_decision)}</td>
-                <td class="px-4 py-3 text-center">${verdictBadge(r.verdict)}</td>
+                <td class="px-4 py-3 text-xs" style="color: var(--color-text-secondary);">${levelLabel}</td>
+                <td class="px-4 py-3 text-right tabular-nums" style="color: var(--color-text-primary);">${r.adf_statistic?.toFixed(3) ?? '—'}</td>
+                <td class="px-4 py-3 text-right tabular-nums" style="color: var(--color-text-primary);">${r.adf_p_value?.toFixed(4) ?? '—'}</td>
+                <td class="px-4 py-3 text-center">${pBadge(adfDecision)}</td>
+                <td class="px-4 py-3 text-right tabular-nums" style="color: var(--color-text-primary);">${r.kpss_statistic?.toFixed(3) ?? '—'}</td>
+                <td class="px-4 py-3 text-center">${pBadge(kpssDecision)}</td>
+                <td class="px-4 py-3 text-center">${verdictBadge(r.conclusion)}</td>
             </tr>
-        `).join('');
+            `;
+        }).join('');
 
         const meta = data.metadata ?? {};
         document.getElementById('station-legend').innerHTML = `
