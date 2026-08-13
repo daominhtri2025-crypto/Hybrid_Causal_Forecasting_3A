@@ -140,6 +140,7 @@
             document.getElementById('coint-table-wrap').classList.add('hidden');
             const skipped = document.getElementById('coint-skipped');
             skipped.classList.remove('hidden');
+            const infoText = explanation || 'Pipeline không tạo kết quả kiểm định Johansen cho dataset này.';
             skipped.innerHTML = `
                 <div class="flex items-start gap-3">
                     <svg class="h-5 w-5 shrink-0 mt-0.5" style="color: var(--color-accent-cyan);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -147,12 +148,11 @@
                     </svg>
                     <div>
                         <p class="text-sm font-medium" style="color: var(--color-text-primary);">Johansen test — không có dữ liệu Trace/Max-Eigenvalue</p>
-                        <p class="mt-1 text-xs" style="color: var(--color-text-muted);">
-                            ${window.escapeHtml(explanation || 'Pipeline không tạo kết quả kiểm định Johansen cho dataset này.')}
-                        </p>
+                        <p id="coint-skip-reason" class="mt-1 text-xs" style="color: var(--color-text-muted);"></p>
                     </div>
                 </div>
             `;
+            document.getElementById('coint-skip-reason').textContent = infoText;
         } else {
             document.getElementById('coint-tbody').innerHTML = tests.map(t => {
                 const cv95 = t.critical_values?.['95%'] ?? null;
