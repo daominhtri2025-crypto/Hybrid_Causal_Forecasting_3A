@@ -107,7 +107,14 @@ def _warn_midnight_boundary(
     dt_series = pd.to_datetime(df[date_col], errors="coerce")
     hours = dt_series.dt.hour
 
-    mask = (hours >= 22) | (hours < 2)
+    # NAV lưu date-only dưới dạng datetime 00:00:00 — đây là timestamp chuẩn,
+    # không phải bản ghi "cận nửa đêm". Loại bỏ các bản ghi có time = 00:00:00.
+    is_exact_midnight = (
+        (hours == 0)
+        & (dt_series.dt.minute == 0)
+        & (dt_series.dt.second == 0)
+    )
+    mask = ((hours >= 22) | (hours < 2)) & ~is_exact_midnight
     boundary_df = df[mask]
     count = len(boundary_df)
 

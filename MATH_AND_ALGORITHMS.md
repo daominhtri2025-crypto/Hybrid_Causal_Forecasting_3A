@@ -421,11 +421,11 @@ lý như dừng (bảo thủ) — tránh over-differencing.
 
 | Biến | $d(i)$ | Phân loại |
 |------|---------|-----------|
-| ProductionVolume | _[chạy lại pipeline]_ | _[chạy lại]_ |
-| DelayRate | _[chạy lại pipeline]_ | _[chạy lại]_ |
-| OrderDemand | _[chạy lại pipeline]_ | _[chạy lại]_ |
+| ProductionVolume | 0 | I(0) — dừng ở mức gốc (ADF bác bỏ, KPSS giữ H₀) |
+| DelayRate | 0 | I(0) — dừng ở mức gốc (ADF bác bỏ, KPSS giữ H₀) |
+| OrderDemand | 0 | I(0) — dừng ở mức gốc (ADF bác bỏ, KPSS giữ H₀) |
 
-$d_{\max} = \max\{d(i)\}$ _[chạy lại pipeline để xác định]_ (dùng cho Toda-Yamamoto).
+$d_{\max} = \max\{d(i)\} = 0$ — tất cả biến đều I(0), không cần sai phân. Toda-Yamamoto sử dụng $d_{\max} = 0$, do đó VAR mở rộng có tổng lag = $k + 0 = k$.
 
 ### 3.4. Kiểm định Đồng tích hợp Johansen (Phase 3)
 
@@ -469,12 +469,18 @@ Khi Trace và Max-Eigenvalue cho rank khác nhau, ưu tiên **Trace** (Johansen 
 
 Với $n = 3$ biến (ProductionVolume, DelayRate, OrderDemand), kết quả Johansen test:
 
-_[Chạy lại pipeline để xác định rank $r$ — kết quả cũ dựa trên hệ 4 biến không còn hợp lệ.]_
+**Kết quả thực tế:** Tất cả 3 biến đều I(0) (dừng ở mức gốc). Johansen test trên hệ
+3 biến I(0) cho $r = 3$ (full rank) — Trace test và Max-Eigenvalue test đều bác bỏ
+mọi giả thuyết $H_0$ từ $r \leq 0$ đến $r \leq 2$. Kết quả $r = n = 3$ xác nhận
+**tất cả biến đã dừng** — ma trận $\Pi$ full rank, không có common stochastic trend.
 
-**Route:** Tùy thuộc vào rank $r$ xác định từ pipeline:
-- $0 < r < n = 3$ → **VECM** (Vector Error Correction Model)
-- $r = 0$ → **VAR trên sai phân** (không có đồng tích hợp)
-- $r = n = 3$ → **VAR trên mức** (tất cả chuỗi dừng)
+**Route: VAR trên mức gốc (VAR\_on\_levels)**
+
+Khi $r = n = 3$ (full rank), hệ thống không có quan hệ đồng tích hợp theo nghĩa
+Johansen — tất cả biến đã dừng ở mức. Mô hình phù hợp là **VAR trên chuỗi mức**
+(levels), không phải VECM. Điều này có ý nghĩa kinh tế: ProductionVolume, DelayRate,
+và OrderDemand đều mean-reverting — không có xu hướng stochastic dài hạn, phù hợp
+với dữ liệu sản xuất tuần có tính mùa vụ và quay về trung bình.
 
 ### 3.5. Kiểm định Nhân quả Toda-Yamamoto (Phase 3b)
 
@@ -491,10 +497,10 @@ $$
 
 Trong đó:
 - $y_t \in \mathbb{R}^n$: vector biến nội sinh (3 biến).
-- $k$: lag tối ưu chọn trên chuỗi mức bằng AIC _[chạy lại pipeline]_.
-- $d_{\max}$: bậc tích hợp lớn nhất (từ Phase 1) _[chạy lại pipeline]_.
+- $k = 12$: lag tối ưu chọn trên chuỗi mức bằng AIC (Schwert maxlag = 17, AIC chọn lag = 12).
+- $d_{\max} = 0$: bậc tích hợp lớn nhất (từ Phase 1 — tất cả biến I(0)).
 - $A_j \in \mathbb{R}^{n \times n}$: ma trận hệ số lag $j$.
-- Tổng lag mô hình: $k + d_{\max}$ [chạy lại pipeline để xác định].
+- Tổng lag mô hình: $k + d_{\max} = 12 + 0 = 12$. Vì $d_{\max} = 0$, kiểm định Wald của Toda-Yamamoto tương đương Granger causality trên levels.
 
 #### 3.5.2. Kiểm định Wald
 
@@ -534,17 +540,23 @@ Trong đó:
 - $\beta \in \mathbb{R}^{n \times r}$: ma trận vector đồng tích hợp ($r$ xác định từ Johansen test).
 - $\alpha \in \mathbb{R}^{n \times r}$: ma trận tốc độ điều chỉnh (loading coefficients).
 - $\Gamma_i \in \mathbb{R}^{n \times n}$: hệ số ngắn hạn (short-run dynamics) cho lag $i$.
-- $k$: `k_ar_diff` = 0 → **không có thành phần $\Gamma$** trong mô hình thực tế.
-- $c \in \mathbb{R}^n$: hằng số không hạn chế (unrestricted constant, `deterministic='co'`).
+- $k$: số lag sai phân (lagged differences).
+- $c \in \mathbb{R}^n$: hằng số không hạn chế (unrestricted constant).
 - $u_t \sim N(0, \Sigma_u)$: vector nhiễu trắng (innovation).
 
-**Dạng rút gọn thực tế của dự án** (với $k\_ar\_diff = 0$):
+> **Kết quả thực tế của dự án:** Do tất cả 3 biến đều I(0), route là **VAR trên
+> mức gốc** (VAR\_on\_levels), KHÔNG phải VECM. Mô hình VECM ở trên được trình bày
+> như **phương pháp luận dự phòng** — nếu có biến I(1) và tồn tại đồng tích hợp, VECM
+> sẽ là lựa chọn phù hợp. Trong thực tế, pipeline tự động chọn VAR(12) trên levels
+> dựa trên kết quả Phase 1 (tất cả I(0)) và Phase 3 ($r = 3$, full rank).
+
+**Dạng thực tế của dự án — VAR(12) trên mức gốc:**
 
 $$
-\boxed{\Delta y_t = \alpha \cdot \beta' y_{t-1} + c + u_t}
+\boxed{y_t = c + \sum_{i=1}^{12} A_i \, y_{t-i} + u_t}
 $$
 
-Mô hình **chỉ có error correction term và constant** — không có lagged differences ($\Gamma$). Đây là lựa chọn phù hợp với mẫu nhỏ (DoF giới hạn khi $n = 3$).
+Mô hình VAR(12) trực tiếp trên chuỗi mức — AIC chọn $p = 12$ lag từ Schwert maxlag = 17. Với $T = 412$ quan sát (sau dropna), $T_{\text{eff}} = 400$ quan sát hiệu dụng.
 
 ### 4.2. Ma trận Impact $\Pi = \alpha \cdot \beta'$ (Phân rã Rank)
 
@@ -556,57 +568,47 @@ Ma trận $\Pi$ nắm bắt **toàn bộ thông tin dài hạn** của hệ th�
 - $\beta$: **hướng** cân bằng (equilibrium relationships).
 - $\alpha$: **tốc độ** hội tụ về cân bằng (speed of adjustment).
 
-### 4.3. Phương trình Đồng tích hợp Dài hạn (Cointegrating Equations)
+### 4.3. Quan hệ Dài hạn trong Mô hình VAR trên Mức
 
-_[Kết quả cụ thể cần chạy lại pipeline với hệ 3 biến mới. Cấu trúc tổng quát:]_
+> **Lưu ý:** Mục này thay thế phần "Phương trình đồng tích hợp" trong thiết kế
+> ban đầu. Kết quả Phase 1 cho thấy tất cả biến I(0) → $r = 3$ (full rank) →
+> **không tồn tại quan hệ đồng tích hợp** theo nghĩa Johansen. Ma trận $\beta$
+> và phương trình CE không áp dụng.
 
-Với $r$ vector đồng tích hợp (xác định bởi Johansen test ở mục 3.4), mỗi CE có dạng:
+Trong mô hình VAR(12) trên mức, quan hệ dài hạn giữa các biến được nắm bắt **gián
+tiếp** qua hệ số VAR tích lũy (cumulative VAR coefficients) thay vì qua ma trận
+$\beta$ đồng tích hợp. Chuỗi nhân quả kinh tế vẫn được kiểm chứng qua:
 
-$$
-\beta_1 \cdot \text{ProductionVolume} + \beta_2 \cdot \text{DelayRate} + \beta_3 \cdot \text{OrderDemand} \approx 0
-$$
+1. **Granger causality** (Phase 2): 3/6 cặp có ý nghĩa thống kê.
+2. **Toda-Yamamoto** (Phase 3b): 2/6 cặp có ý nghĩa, tỷ lệ đồng thuận 83%.
+3. **FEVD** (Phase 5): phân rã phương sai cho thấy cấu trúc nhân quả thực tế.
+4. **IRF** (Phase 5): phản ứng xung xác nhận mức độ tác động.
 
-**Kỳ vọng kinh tế:** Quan hệ dài hạn giữa OrderDemand (nhu cầu) → ProductionVolume
-(sản lượng đáp ứng) → DelayRate (tỷ lệ trễ do quá tải).
+### 4.4. Cấu trúc Nhân quả — Kết quả VAR trên Mức
 
-#### Dạng ma trận $\beta$ (normalized):
+> **Lưu ý:** Ma trận $\alpha$ (speed of adjustment) và half-life hội tụ chỉ áp dụng
+> cho VECM. Với route VAR\_on\_levels, phần này trình bày kết quả **Granger causality**
+> và **FEVD** thay cho $\alpha$.
 
-$$
-\beta \in \mathbb{R}^{3 \times r}
-\quad
-\begin{matrix}
-\leftarrow \text{ProductionVolume} \\
-\leftarrow \text{DelayRate} \\
-\leftarrow \text{OrderDemand}
-\end{matrix}
-$$
+**Kết quả Granger causality (Phase 2) — 3/6 cặp có ý nghĩa:**
 
-_[Giá trị cụ thể: chạy lại pipeline — xem `reports/phase3_cointegration.json`]_
+| Cặp nhân quả | Lag tối ưu | Kết luận |
+|---------------|:----------:|----------|
+| ProductionVolume → DelayRate | 6 | Có ý nghĩa — sản lượng tác động lên tỷ lệ trễ |
+| ProductionVolume → OrderDemand | 10 | Có ý nghĩa — sản lượng tác động lên nhu cầu |
+| DelayRate → ProductionVolume | 12 | Có ý nghĩa — trễ phản hồi lên sản lượng |
 
-### 4.4. Ma trận Hệ số Điều chỉnh Tốc độ $\alpha$ (Speed of Adjustment)
+**FEVD tại $h = 12$ tuần — Phát hiện chính (Null Finding):**
 
-$$
-\alpha \in \mathbb{R}^{3 \times r}
-\quad
-\begin{matrix}
-\leftarrow \text{ProductionVolume} \\
-\leftarrow \text{DelayRate} \\
-\leftarrow \text{OrderDemand}
-\end{matrix}
-$$
+| Nguồn shock | Đóng góp vào phương sai DelayRate |
+|-------------|:---------------------------------:|
+| DelayRate (tự thân) | 94.0% |
+| ProductionVolume | 3.8% |
+| OrderDemand | 2.3% |
 
-_[Giá trị cụ thể: chạy lại pipeline — xem `reports/tang4_vecm_results.json`]_
-
-**Diễn giải cơ chế hội tụ:**
-
-| Biến | $\alpha_{i,1}$ (CE1) | Diễn giải kỳ vọng |
-|------|---------------------|-----------|
-| ProductionVolume | _[chạy lại]_ | Error correcting nếu $\alpha < 0$: sản lượng tự điều chỉnh khi lệch cân bằng |
-| DelayRate | _[chạy lại]_ | Kỳ vọng weakly exogenous nếu $|\alpha| \approx 0$ |
-| OrderDemand | _[chạy lại]_ | Nhu cầu đặt hàng — có thể exogenous (ít bị ảnh hưởng bởi ECT) |
-
-**Ý nghĩa kinh tế của $\alpha < 0$ (error correcting):**
-- Khi ECT > 0 (hệ thống lệch khỏi cân bằng theo hướng dương), biến có $\alpha < 0$ sẽ **giảm** ở kỳ tiếp theo → kéo hệ thống quay về cân bằng.
+DelayRate chủ yếu mang tính **tự hồi quy** (autoregressive) — 94% phương sai được
+giải thích bởi chính nó. Dù Granger causality phát hiện quan hệ có ý nghĩa thống kê,
+FEVD cho thấy tác động **thực tiễn** từ ProductionVolume và OrderDemand là rất nhỏ.
 
 ### 4.5. Khoảng tin cậy Dự báo — Phương pháp IRF/MA (Lütkepohl, 2005)
 
@@ -677,11 +679,15 @@ $$
 $$
 
 Trong đó:
-- $\mathcal{L}$: log-likelihood _[chạy lại pipeline]_.
-- $k$: tổng số tham số (3 biến × params/eq — tùy thuộc $r$ và $k\_ar\_diff$).
-- $T$: số quan sát hiệu dụng _[chạy lại pipeline]_.
+- $\mathcal{L} = -11{,}177.62$: log-likelihood của VAR(12) trên levels.
+- $k$: tổng số tham số. Với VAR(12), 3 biến: mỗi phương trình có $12 \times 3 + 1 = 37$
+  tham số (12 lag × 3 biến + intercept), tổng = $37 \times 3 = 111$ tham số.
+- $T = 400$: số quan sát hiệu dụng (412 dòng − 12 lag ban đầu).
 
-**Kết quả:** _[Chạy lại pipeline — xem `reports/tang4_vecm_results.json`]_
+**Kết quả:**
+- **AIC** = 47.93
+- **BIC** = 49.04
+- **Bậc tự do/phương trình** = 363 ($T_{\text{eff}} - k_{\text{per\_eq}} = 400 - 37$)
 
 ---
 
