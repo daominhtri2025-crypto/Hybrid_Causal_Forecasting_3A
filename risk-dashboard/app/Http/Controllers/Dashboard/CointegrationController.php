@@ -48,6 +48,7 @@ class CointegrationController extends Controller
             // Ưu tiên route/explanation từ johansen_result (Python pipeline đã tính sẵn)
             $finalRoute = $raw['model_route'] ?? $johansen['route'] ?? $route;
             $finalExplanation = $johansen['route_explanation']
+                ?? $raw['route_explanation']
                 ?? $this->explainRoute($finalRoute, $rank, $nVariables);
 
             return response()->json([
@@ -59,6 +60,8 @@ class CointegrationController extends Controller
                     'n_variables' => $nVariables,
                     'route'       => $finalRoute,
                     'route_explanation' => $finalExplanation,
+                    'johansen_skipped' => $johansen['skipped'] ?? false,
+                    'johansen_skip_reason' => $johansen['skip_reason'] ?? null,
                     'trace_test'  => is_array($traceTest) && isset($traceTest['details']) ? $traceTest : null,
                     'max_eigen_test' => is_array($maxEigenTest) && isset($maxEigenTest['details']) ? $maxEigenTest : null,
                 ],

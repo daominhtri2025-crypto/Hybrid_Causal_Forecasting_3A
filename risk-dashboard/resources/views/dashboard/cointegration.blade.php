@@ -146,10 +146,9 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                     <div>
-                        <p class="text-sm font-medium" style="color: var(--color-text-primary);">Bảng Trace test không có dữ liệu</p>
+                        <p class="text-sm font-medium" style="color: var(--color-text-primary);">Johansen test — không có dữ liệu Trace/Max-Eigenvalue</p>
                         <p class="mt-1 text-xs" style="color: var(--color-text-muted);">
-                            Tất cả biến đều dừng ở mức I(0) → full rank → pipeline bỏ qua kiểm định Johansen.
-                            Route được xác định trực tiếp từ kết quả Phase 1.
+                            ${window.escapeHtml(explanation || 'Pipeline không tạo kết quả kiểm định Johansen cho dataset này.')}
                         </p>
                     </div>
                 </div>
