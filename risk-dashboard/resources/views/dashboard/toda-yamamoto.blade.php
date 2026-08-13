@@ -109,7 +109,7 @@
     }
 
     function render(data) {
-        const agr = data.agreement_pct;
+        const agr = data.summary?.agreement_pct;
         document.getElementById('ty-agreement').innerHTML = `
             <div class="flex items-center gap-4">
                 <div class="text-3xl font-bold tabular-nums" style="color: var(--color-accent-blue);">${agr != null ? agr + '%' : '—'}</div>
@@ -121,18 +121,24 @@
         `;
 
         const pairs = data.comparison ?? [];
-        document.getElementById('ty-tbody').innerHTML = pairs.map(p => `
+        document.getElementById('ty-tbody').innerHTML = pairs.map(p => {
+            const isMatch = p.agreement === 'agree';
+            const isGrangerMissing = p.agreement === 'granger_missing';
+            return `
             <tr class="border-t" style="border-color: var(--color-border);">
                 <td class="px-4 py-3 font-medium" style="color: var(--color-text-primary);">${p.cause} → ${p.effect}</td>
-                <td class="px-4 py-3 text-center">${sigBadge(p.granger_significant)}</td>
+                <td class="px-4 py-3 text-center">${p.granger_significant != null ? sigBadge(p.granger_significant) : '<span class="text-xs" style="color: var(--color-text-muted);">N/A</span>'}</td>
                 <td class="px-4 py-3 text-center">${sigBadge(p.ty_significant)}</td>
                 <td class="px-4 py-3 text-center">
-                    ${p.agree
-                        ? '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" style="background-color: rgba(34,197,94,0.15); color: var(--color-kpi-positive);">Match</span>'
-                        : '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" style="background-color: rgba(249,115,22,0.15); color: var(--color-accent-orange);">Mismatch</span>'}
+                    ${isGrangerMissing
+                        ? '<span class="text-xs" style="color: var(--color-text-muted);">N/A</span>'
+                        : isMatch
+                            ? '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" style="background-color: rgba(34,197,94,0.15); color: var(--color-kpi-positive);">Match</span>'
+                            : '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" style="background-color: rgba(249,115,22,0.15); color: var(--color-accent-orange);">Mismatch</span>'}
                 </td>
             </tr>
-        `).join('');
+            `;
+        }).join('');
     }
 
     load();

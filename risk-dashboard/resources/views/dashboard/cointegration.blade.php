@@ -110,7 +110,10 @@
     }
 
     function render(data) {
-        const route = data.route ?? {};
+        const routeStr = (data.route ?? '—').replace(/_/g, ' ');
+        const rank = data.rank ?? '—';
+        const explanation = data.route_explanation ?? '';
+
         document.getElementById('route-decision').innerHTML = `
             <div class="flex items-start gap-4">
                 <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
@@ -121,23 +124,24 @@
                 </div>
                 <div>
                     <h3 class="text-base font-semibold" style="color: var(--color-text-primary);">
-                        Route: ${route.selected_route?.replace(/_/g, ' ') ?? '—'}
+                        Route: ${routeStr}
                     </h3>
                     <p class="mt-1 text-sm" style="color: var(--color-text-secondary);">
-                        Cointegration rank r = ${route.rank ?? '—'} &middot; ${route.explanation ?? ''}
+                        Cointegration rank r = ${rank} &middot; ${explanation}
                     </p>
                 </div>
             </div>
         `;
 
-        const tests = data.rank_tests ?? [];
+        const tests = data.trace_test?.details ?? [];
         document.getElementById('coint-tbody').innerHTML = tests.map(t => {
-            const rejected = (t.trace_stat ?? 0) > (t.critical_value ?? Infinity);
+            const cv95 = t.critical_values?.['95%'] ?? null;
+            const rejected = t.reject_h0_at_5pct ?? ((t.statistic ?? 0) > (cv95 ?? Infinity));
             return `
                 <tr class="border-t" style="border-color: var(--color-border);">
-                    <td class="px-4 py-3 font-medium" style="color: var(--color-text-primary);">r ≤ ${t.r ?? '?'}</td>
-                    <td class="px-4 py-3 text-right tabular-nums" style="color: var(--color-text-primary);">${t.trace_stat?.toFixed(3) ?? '—'}</td>
-                    <td class="px-4 py-3 text-right tabular-nums" style="color: var(--color-text-secondary);">${t.critical_value?.toFixed(3) ?? '—'}</td>
+                    <td class="px-4 py-3 font-medium" style="color: var(--color-text-primary);">${t.h0 ?? '?'}</td>
+                    <td class="px-4 py-3 text-right tabular-nums" style="color: var(--color-text-primary);">${t.statistic?.toFixed(3) ?? '—'}</td>
+                    <td class="px-4 py-3 text-right tabular-nums" style="color: var(--color-text-secondary);">${cv95?.toFixed(3) ?? '—'}</td>
                     <td class="px-4 py-3 text-center">
                         ${rejected
                             ? '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" style="background-color: rgba(239,68,68,0.15); color: var(--color-accent-red);">Reject</span>'
