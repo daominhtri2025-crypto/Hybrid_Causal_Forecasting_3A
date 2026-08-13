@@ -32,3 +32,7 @@ Thumbs.db
 
 # Dữ liệu raw snapshot có thể rất lớn — chỉ commit khi cần thiết
 # data/raw/snapshot_*/
+
+# Laravel runtime directories
+risk-dashboard/storage/framework/
+risk-dashboard/storage/logs/
