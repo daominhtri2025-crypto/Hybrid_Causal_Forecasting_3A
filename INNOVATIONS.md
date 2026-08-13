@@ -349,10 +349,10 @@ Orchestrator `main_pipeline.py` hỗ trợ tiếp tục pipeline từ Phase bấ
 
 ```bash
 # Dừng sau Phase 1 (debug kiểm định tính dừng)
-python main_pipeline.py --stop-after phase1
+python -m main_pipeline --stop-after phase1
 
 # Tiếp tục từ Phase 3 (Phase 0, 1 đã có output)
-python main_pipeline.py --resume-from phase3
+python -m main_pipeline --resume-from phase3
 ```
 
 **Cơ chế:** Mỗi Phase có **file output kỳ vọng** — khi `--resume-from` được

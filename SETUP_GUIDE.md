@@ -199,7 +199,7 @@ Chạy tuần tự từ Tầng 1 đến Tầng 4. Mỗi tầng đọc output c�
 ### Tầng 1 — Khai thác dữ liệu từ SQL Server
 
 ```bash
-python scripts/tang1_db_extractor.py
+python -m scripts.tang1_db_extractor
 ```
 
 > Yêu cầu: Các bảng Dynamics NAV phải tồn tại trong CSDL QTDN — xem mục 3.3.
@@ -218,7 +218,7 @@ python scripts/tang1_db_extractor.py
 ### Tầng 2 — Tiền xử lý và xây dựng dataset tuần (Phase 0)
 
 ```bash
-python scripts/phase0_data_reengineering.py
+python -m scripts.phase0_data_reengineering
 ```
 
 - Gộp 3 bảng theo OrderNo, tổng hợp theo tuần (ISO week)
@@ -233,16 +233,16 @@ Chạy lần lượt 4 script:
 
 ```bash
 # Phase 1: Kiểm định tính dừng (ADF + KPSS Dual Confirmation)
-python scripts/phase1_stationarity.py
+python -m scripts.phase1_stationarity
 
 # Phase 2: Kiểm định nhân quả Granger
-python scripts/phase2_granger_causality.py
+python -m scripts.phase2_granger_causality
 
 # Phase 3: Kiểm định đồng tích hợp Johansen (Trace + Max-Eigenvalue)
-python scripts/phase3_cointegration.py
+python -m scripts.phase3_cointegration
 
 # Phase 3b: Kiểm định Toda-Yamamoto (Cross-check nhân quả trên biến levels)
-python scripts/phase3b_toda_yamamoto.py
+python -m scripts.phase3b_toda_yamamoto
 ```
 
 | Script | Chức năng | Output JSON |
@@ -258,7 +258,7 @@ python scripts/phase3b_toda_yamamoto.py
 ### Tầng 4 — Dự báo VECM
 
 ```bash
-python scripts/tang4_vecm_forecasting.py
+python -m scripts.tang4_vecm_forecasting
 ```
 
 - Đọc tham số từ JSON của Tầng 3 (k_ar_diff, coint_rank, deterministic)
@@ -272,7 +272,7 @@ toàn bộ pipeline tự động, bao gồm error handling và ghi nhật ký ch
 giữa các Phase:
 
 ```bash
-python main_pipeline.py
+python -m main_pipeline
 ```
 
 #### Tham số dòng lệnh (CLI Arguments)
@@ -289,13 +289,13 @@ tiết kiệm thời gian khi debug hoặc phát triển Phase cụ thể:
 
 ```bash
 # Chạy toàn bộ pipeline từ đầu
-python main_pipeline.py
+python -m main_pipeline
 
 # Tiếp tục từ Phase 3 — Phase 0 và 1 được bỏ qua nếu output JSON/CSV đã tồn tại
-python main_pipeline.py --resume-from phase3
+python -m main_pipeline --resume-from phase3
 
 # Chỉ chạy Phase 4
-python main_pipeline.py --resume-from phase4 --stop-after phase4
+python -m main_pipeline --resume-from phase4 --stop-after phase4
 ```
 
 **Cơ chế hoạt động:**
@@ -321,7 +321,7 @@ Khi `--resume-from` được truyền:
 - `--resume-from` **không đảm bảo** kết quả Phase trước vẫn hợp lệ — nếu đã
   thay đổi dữ liệu đầu vào hoặc tham số, nên chạy lại từ đầu.
 - Dùng chủ yếu để **debug** và **phát triển** — trong production nên chạy
-  toàn bộ pipeline (`python main_pipeline.py` không có flag).
+  toàn bộ pipeline (`python -m main_pipeline` không có flag).
 
 ---
 

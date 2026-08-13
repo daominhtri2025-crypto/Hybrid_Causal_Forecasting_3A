@@ -281,10 +281,10 @@ Economic Statistics*, 10(3), 251–270.
 
 ```bash
 # Tiếp tục từ Phase 3 — bỏ qua Phase 0, 1, 2 nếu output đã có
-python main_pipeline.py --resume-from phase3
+python -m main_pipeline --resume-from phase3
 
 # Kết hợp: chỉ chạy Phase 4
-python main_pipeline.py --resume-from phase4 --stop-after phase4
+python -m main_pipeline --resume-from phase4 --stop-after phase4
 ```
 
 ### 10.2. Cơ chế

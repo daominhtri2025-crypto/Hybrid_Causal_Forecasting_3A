@@ -105,7 +105,7 @@ cat data/raw/MANIFEST.md
 **Thao tác:**
 
 ```bash
-python scripts/phase0_data_reengineering.py
+python -m scripts.phase0_data_reengineering
 ```
 
 **Trong khi script chạy — CHỈ vào màn hình terminal:**
@@ -153,10 +153,10 @@ print(f'\nSố tuần bị nội suy: {df[\"is_interpolated_OEE_Score\"].sum()}'
 
 ```bash
 # Chạy tuần tự 4 Phase
-python scripts/phase1_stationarity.py
-python scripts/phase2_granger_causality.py
-python scripts/phase3_cointegration.py
-python scripts/phase3b_toda_yamamoto.py
+python -m scripts.phase1_stationarity
+python -m scripts.phase2_granger_causality
+python -m scripts.phase3_cointegration
+python -m scripts.phase3b_toda_yamamoto
 ```
 
 **Lời thoại trong khi Phase 1 chạy:**
@@ -199,7 +199,7 @@ print(f'k_ar_diff: {r[\"k_ar_diff\"]}')
 **Thao tác:**
 
 ```bash
-python scripts/tang4_vecm_forecasting.py
+python -m scripts.tang4_vecm_forecasting
 ```
 
 **Sau khi chạy xong — mở kết quả:**
@@ -256,7 +256,7 @@ open data/processed/figures/vecm_forecast.png
 
 ```bash
 # Bước 1: Chạy pipeline nhưng DỪNG sau Phase 1
-python main_pipeline.py --stop-after phase1
+python -m main_pipeline --stop-after phase1
 ```
 
 **Lời thoại gợi ý:**
@@ -272,7 +272,7 @@ python main_pipeline.py --stop-after phase1
 ls reports/phase1_stationarity.json
 
 # Bước 3: Tiếp tục pipeline từ Phase 3 — bỏ qua Phase 0 và 1
-python main_pipeline.py --resume-from phase3
+python -m main_pipeline --resume-from phase3
 ```
 
 > "Bây giờ tôi chạy tiếp bằng `--resume-from phase3`. Hệ thống kiểm tra file

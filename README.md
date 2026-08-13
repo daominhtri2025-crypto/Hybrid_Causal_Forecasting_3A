@@ -322,47 +322,47 @@ Các thư viện chính: `pandas`, `numpy`, `statsmodels`, `scipy`.
 ```bash
 # ─── Tầng 1: Trích xuất dữ liệu từ SQL Server ───
 # (Chỉ chạy trên máy có kết nối SQL Server — không chạy trên sandbox)
-python scripts/tang1_db_extractor.py
+python -m scripts.tang1_db_extractor
 
 # ─── Tầng 2: Tái cấu trúc dữ liệu thô → dataset tuần ───
-python -c "from scripts.phase0_data_reengineering import run_phase0; run_phase0()"
+python -m scripts.phase0_data_reengineering
 
 #   ⏸ ĐIỂM DỪNG 1: Kiểm tra data/processed/causal_weekly_dataset.csv
 #     → Xác nhận số tuần, khoảng thời gian, tỷ lệ tuần nội suy.
 
 # ─── Tầng 3: Kiểm định kinh tế lượng (chạy theo thứ tự) ───
-python scripts/phase1_stationarity.py
-python scripts/phase2_granger_causality.py
-python scripts/phase3_cointegration.py
-python scripts/phase3b_toda_yamamoto.py
+python -m scripts.phase1_stationarity
+python -m scripts.phase2_granger_causality
+python -m scripts.phase3_cointegration
+python -m scripts.phase3b_toda_yamamoto
 
 #   ⏸ ĐIỂM DỪNG 2: Kiểm tra reports/phase3_cointegration.json
 #     → Xác nhận rank r, route (VECM/VAR) trước khi dự báo.
 
 # ─── Tầng 4: Dự báo VECM ───
-python scripts/tang4_vecm_forecasting.py
+python -m scripts.tang4_vecm_forecasting
 ```
 
 ### 4.2b. Chạy pipeline one-click (Orchestrator)
 
 ```bash
 # Demo (full synthetic) — chạy toàn bộ Phase 0 → Phase 5
-python main_pipeline.py
+python -m main_pipeline
 
 # Hybrid mode — Delay thật + OEE/Revenue giả lập
-python main_pipeline.py --delay-csv data/raw/snapshot_.../cmt_delay_results.csv
+python -m main_pipeline --delay-csv data/raw/snapshot_.../cmt_delay_results.csv
 
 # Dữ liệu thật hoàn chỉnh — bỏ qua Phase 0
-python main_pipeline.py --data real_data.xlsx
+python -m main_pipeline --data real_data.xlsx
 
 # Chỉ chạy đến Phase 3 (debug kiểm định)
-python main_pipeline.py --stop-after phase3
+python -m main_pipeline --stop-after phase3
 
 # Tiếp tục từ Phase 3 — bỏ qua Phase 0-2 nếu output đã có
-python main_pipeline.py --resume-from phase3
+python -m main_pipeline --resume-from phase3
 
 # Chỉ chạy Phase 4 (kết hợp resume + stop)
-python main_pipeline.py --resume-from phase4 --stop-after phase4
+python -m main_pipeline --resume-from phase4 --stop-after phase4
 ```
 
 **Tham số `--resume-from`:** Bỏ qua các Phase trước điểm chỉ định nếu file
