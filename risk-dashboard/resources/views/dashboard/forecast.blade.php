@@ -7,7 +7,7 @@
 @section('export-buttons')
 <button class="btn-export" data-export="forecast-export" onclick="exportSectionPDF('forecast-export', 'phase4_forecast.pdf')">
     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-    Export PDF
+    <span data-i18n="header.export_pdf">Export PDF</span>
 </button>
 @endsection
 
@@ -22,31 +22,50 @@
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
             <div>
-                <div class="explainer-title">Dự báo VAR (Vector Autoregression)</div>
-                <div class="explainer-subtitle">Mô hình dự báo đa biến — mỗi biến phụ thuộc vào quá khứ của tất cả biến</div>
+                <div class="explainer-title">
+                    <span data-lang="vi">Dự báo VAR (Vector Autoregression)</span>
+                    <span data-lang="en" style="display: none;">VAR Forecast (Vector Autoregression)</span>
+                </div>
+                <div class="explainer-subtitle">
+                    <span data-lang="vi">Mô hình dự báo đa biến — mỗi biến phụ thuộc vào quá khứ của tất cả biến</span>
+                    <span data-lang="en" style="display: none;">Multivariate forecast model — each variable depends on the history of all variables</span>
+                </div>
             </div>
         </div>
         <svg id="explain-forecast-icon" class="explainer-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
     </div>
     <div id="explain-forecast" class="explainer-body hidden math-content">
-        <p>
-            Mô hình <span class="highlight">VAR(p)</span> mô tả hệ thống $k$ biến, trong đó mỗi biến là hàm tuyến tính
-            của $p$ giá trị trễ của <em>tất cả</em> biến trong hệ thống.
-        </p>
+        <div data-lang="vi">
+            <p>
+                Mô hình <span class="highlight">VAR(p)</span> mô tả hệ thống $k$ biến, trong đó mỗi biến là hàm tuyến tính
+                của $p$ giá trị trễ của <em>tất cả</em> biến trong hệ thống.
+            </p>
 
-        <div class="formula-block">
-            <div class="formula-label">VAR(p) — dạng ma trận</div>
-            $$\mathbf{Y}_t = \mathbf{c} + \mathbf{A}_1 \mathbf{Y}_{t-1} + \mathbf{A}_2 \mathbf{Y}_{t-2} + \ldots + \mathbf{A}_p \mathbf{Y}_{t-p} + \mathbf{u}_t$$
+            <div class="formula-block">
+                <div class="formula-label">VAR(p) — dạng ma trận</div>
+                $$\mathbf{Y}_t = \mathbf{c} + \mathbf{A}_1 \mathbf{Y}_{t-1} + \mathbf{A}_2 \mathbf{Y}_{t-2} + \ldots + \mathbf{A}_p \mathbf{Y}_{t-p} + \mathbf{u}_t$$
+            </div>
+
+            <p>
+                Trong đó $\mathbf{Y}_t$ là vector $k \times 1$ (3 biến: ProductionVolume, DelayRate, OrderDemand),
+                $\mathbf{A}_i$ là ma trận hệ số $k \times k$, và $\mathbf{u}_t \sim N(\mathbf{0}, \Sigma)$.
+            </p>
+            <p>
+                <span class="highlight-orange">Khoảng tin cậy 95%:</span> Các dải CI được tính bằng bootstrap,
+                thể hiện mức độ bất định của dự báo — dải rộng hơn = bất định lớn hơn.
+            </p>
         </div>
+        <div data-lang="en" style="display: none;">
+            <p>The <span class="highlight">VAR(p)</span> model describes a system of $k$ variables, where each variable is a linear function of $p$ lagged values of <em>all</em> variables in the system.</p>
 
-        <p>
-            Trong đó $\mathbf{Y}_t$ là vector $k \times 1$ (3 biến: ProductionVolume, DelayRate, OrderDemand),
-            $\mathbf{A}_i$ là ma trận hệ số $k \times k$, và $\mathbf{u}_t \sim N(\mathbf{0}, \Sigma)$.
-        </p>
-        <p>
-            <span class="highlight-orange">Khoảng tin cậy 95%:</span> Các dải CI được tính bằng bootstrap,
-            thể hiện mức độ bất định của dự báo — dải rộng hơn = bất định lớn hơn.
-        </p>
+            <div class="formula-block">
+                <div class="formula-label">VAR(p) — Matrix Form</div>
+                $$\mathbf{Y}_t = \mathbf{c} + \mathbf{A}_1 \mathbf{Y}_{t-1} + \mathbf{A}_2 \mathbf{Y}_{t-2} + \ldots + \mathbf{A}_p \mathbf{Y}_{t-p} + \mathbf{u}_t$$
+            </div>
+
+            <p>Where $\mathbf{Y}_t$ is a $k \times 1$ vector (3 variables: ProductionVolume, DelayRate, OrderDemand), $\mathbf{A}_i$ is a $k \times k$ coefficient matrix, and $\mathbf{u}_t \sim N(\mathbf{0}, \Sigma)$.</p>
+            <p><span class="highlight-orange">95% Confidence Intervals:</span> CI bands are computed via bootstrap, reflecting forecast uncertainty — wider bands = greater uncertainty.</p>
+        </div>
     </div>
 </div>
 
@@ -72,6 +91,9 @@
 
         {{-- Warnings --}}
         <div id="forecast-warnings" class="hidden"></div>
+
+        {{-- Notation legend --}}
+        <div id="p4-notation-legend" class="mt-6"></div>
     </div>
 </div>
 
@@ -82,15 +104,20 @@
 <script type="module">
     const VS = window.VARIABLE_STYLES;
     const chartInstances = [];
+    let cachedData = null;
 
     async function loadForecast() {
         try {
             const data = await window.dashboardFetch('forecast');
+            cachedData = data;
             document.getElementById('forecast-loading').classList.add('hidden');
             document.getElementById('forecast-content').classList.remove('hidden');
+            document.getElementById('page-title').textContent = window.t('p4.title');
+            document.getElementById('page-subtitle').textContent = window.t('p4.subtitle');
             renderDiagStrip(data);
             renderCharts(data.forecast);
             renderWarnings(data.warnings);
+            window.renderNotationLegend('p4-notation-legend', { statistics: ['lag', 'ci'], significance: false });
         } catch (err) {
             document.getElementById('forecast-loading').classList.add('hidden');
             document.getElementById('forecast-error').classList.remove('hidden');
@@ -102,12 +129,12 @@
         const d = data.diagnostics;
         const m = data.model;
         const items = [
-            ['Route',       m.route?.replace(/_/g, ' ') ?? '—'],
-            ['Lag Order',   m.lag_order ?? '—'],
-            ['AIC',         d.aic != null ? Number(d.aic).toFixed(1) : '—'],
-            ['BIC',         d.bic != null ? Number(d.bic).toFixed(1) : '—'],
-            ['Log-L',       d.log_likelihood != null ? Number(d.log_likelihood).toFixed(1) : '—'],
-            ['T_eff',       d.effective_obs ?? '—'],
+            [window.t('p4.lbl.route'), m.route?.replace(/_/g, ' ') ?? '—'],
+            [window.t('p4.lbl.lag'),   m.lag_order ?? '—'],
+            ['AIC',                    d.aic != null ? Number(d.aic).toFixed(1) : '—'],
+            ['BIC',                    d.bic != null ? Number(d.bic).toFixed(1) : '—'],
+            [window.t('p4.lbl.logl'),  d.log_likelihood != null ? Number(d.log_likelihood).toFixed(1) : '—'],
+            [window.t('p4.lbl.teff'),  d.effective_obs ?? '—'],
         ];
 
         document.getElementById('diag-strip').innerHTML = items.map(([label, value]) => `
@@ -141,7 +168,7 @@
                         ${style.label}
                     </h3>
                     <span class="text-xs tabular-nums" style="color: var(--color-text-muted);">
-                        ${series.length} periods &middot; 95% CI
+                        ${series.length} ${window.t('p4.chart_info')}
                     </span>
                 </div>
                 <div class="chart-container" style="height: 280px;">
@@ -202,7 +229,7 @@
                         legend: { display: false },
                         tooltip: {
                             callbacks: {
-                                title: (items) => `Week: ${items[0].label}`,
+                                title: (items) => `${window.t('p4.tooltip.week')}: ${items[0].label}`,
                                 label: (ctx) => {
                                     const i = ctx.dataIndex;
                                     if (ctx.datasetIndex === 2) {
@@ -210,7 +237,7 @@
                                         const lo = lowers[i]?.toFixed(4) ?? '—';
                                         const hi = uppers[i]?.toFixed(4) ?? '—';
                                         return [
-                                            `Point: ${pt}`,
+                                            `${window.t('p4.tooltip.point')}: ${pt}`,
                                             `95% CI: [${lo}, ${hi}]`,
                                         ];
                                     }
@@ -247,7 +274,7 @@
         container.innerHTML = `
             <div class="rounded-xl p-5 border" style="background-color: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3);">
                 <h3 class="text-xs font-semibold uppercase tracking-wider mb-2" style="color: var(--color-accent-orange);">
-                    Warnings
+                    ${window.t('common.warnings')}
                 </h3>
                 <ul class="space-y-1">
                     ${warnings.map(w => `<li class="text-sm" style="color: var(--color-text-secondary);">&bull; ${w}</li>`).join('')}
@@ -255,6 +282,16 @@
             </div>
         `;
     }
+
+    window.onLangChange(() => {
+        if (!cachedData) return;
+        document.getElementById('page-title').textContent = window.t('p4.title');
+        document.getElementById('page-subtitle').textContent = window.t('p4.subtitle');
+        renderDiagStrip(cachedData);
+        // Charts don't need re-render (labels are data-driven)
+        renderWarnings(cachedData.warnings);
+        window.renderNotationLegend('p4-notation-legend', { statistics: ['lag', 'ci'], significance: false });
+    });
 
     loadForecast();
 </script>

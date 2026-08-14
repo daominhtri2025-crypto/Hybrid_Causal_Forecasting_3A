@@ -7,7 +7,7 @@
 @section('export-buttons')
 <button class="btn-export" data-export="granger-export" onclick="exportSectionPDF('granger-export', 'phase2_granger_causality.pdf')">
     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-    Export PDF
+    <span data-i18n="header.export_pdf">Export PDF</span>
 </button>
 @endsection
 
@@ -22,37 +22,54 @@
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
             <div>
-                <div class="explainer-title">Kiểm định nhân quả Granger</div>
-                <div class="explainer-subtitle">X có giúp dự báo Y tốt hơn không? — Granger (1969)</div>
+                <div class="explainer-title"><span data-lang="vi">Kiểm định nhân quả Granger</span><span data-lang="en" style="display: none;">Granger Causality Test</span></div>
+                <div class="explainer-subtitle"><span data-lang="vi">X có giúp dự báo Y tốt hơn không? — Granger (1969)</span><span data-lang="en" style="display: none;">Does X help forecast Y? — Granger (1969)</span></div>
             </div>
         </div>
         <svg id="explain-granger-icon" class="explainer-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
     </div>
     <div id="explain-granger" class="explainer-body hidden math-content">
-        <p>
-            Kiểm định Granger đánh giá liệu <span class="highlight">giá trị quá khứ của biến X</span>
-            có cung cấp thông tin dự báo bổ sung cho biến Y hay không, vượt trên thông tin từ chính quá khứ của Y.
-        </p>
+        <div data-lang="vi">
+            <p>
+                Kiểm định Granger đánh giá liệu <span class="highlight">giá trị quá khứ của biến X</span>
+                có cung cấp thông tin dự báo bổ sung cho biến Y hay không, vượt trên thông tin từ chính quá khứ của Y.
+            </p>
 
-        <div class="formula-block">
-            <div class="formula-label">Mô hình không ràng buộc (Unrestricted)</div>
-            $$Y_t = \alpha + \sum_{i=1}^{p} \beta_i Y_{t-i} + \sum_{i=1}^{p} \gamma_i X_{t-i} + \varepsilon_t$$
-        </div>
-
-        <div class="hypothesis-box">
-            <div class="hyp hyp-h0">
-                <strong>H₀:</strong> $\gamma_1 = \gamma_2 = \ldots = \gamma_p = 0$ — X không Granger-cause Y
+            <div class="formula-block">
+                <div class="formula-label">Mô hình không ràng buộc (Unrestricted)</div>
+                $$Y_t = \alpha + \sum_{i=1}^{p} \beta_i Y_{t-i} + \sum_{i=1}^{p} \gamma_i X_{t-i} + \varepsilon_t$$
             </div>
-            <div class="hyp hyp-h1">
-                <strong>H₁:</strong> Ít nhất một $\gamma_i \neq 0$ — X có Granger-cause Y
-            </div>
-        </div>
 
-        <p>
-            Kiểm định sử dụng <span class="highlight">F-test</span> so sánh mô hình có và không có biến X.
-            Với 3 biến trong hệ thống, ta kiểm tra tất cả 6 cặp theo từng chiều — tạo thành ma trận nhân quả heatmap bên dưới.
-            Ngưỡng ý nghĩa: $\alpha = 0.05$.
-        </p>
+            <div class="hypothesis-box">
+                <div class="hyp hyp-h0">
+                    <strong>H₀:</strong> $\gamma_1 = \gamma_2 = \ldots = \gamma_p = 0$ — X không Granger-cause Y
+                </div>
+                <div class="hyp hyp-h1">
+                    <strong>H₁:</strong> Ít nhất một $\gamma_i \neq 0$ — X có Granger-cause Y
+                </div>
+            </div>
+
+            <p>
+                Kiểm định sử dụng <span class="highlight">F-test</span> so sánh mô hình có và không có biến X.
+                Với 3 biến trong hệ thống, ta kiểm tra tất cả 6 cặp theo từng chiều — tạo thành ma trận nhân quả heatmap bên dưới.
+                Ngưỡng ý nghĩa: $\alpha = 0.05$.
+            </p>
+        </div>
+        <div data-lang="en" style="display: none;">
+            <p>The Granger test evaluates whether <span class="highlight">past values of variable X</span> provide additional forecasting information for variable Y, beyond what Y's own past provides.</p>
+
+            <div class="formula-block">
+                <div class="formula-label">Unrestricted Model</div>
+                $$Y_t = \alpha + \sum_{i=1}^{p} \beta_i Y_{t-i} + \sum_{i=1}^{p} \gamma_i X_{t-i} + \varepsilon_t$$
+            </div>
+
+            <div class="hypothesis-box">
+                <div class="hyp hyp-h0"><strong>H₀:</strong> $\gamma_1 = \gamma_2 = \ldots = \gamma_p = 0$ — X does not Granger-cause Y</div>
+                <div class="hyp hyp-h1"><strong>H₁:</strong> At least one $\gamma_i \neq 0$ — X Granger-causes Y</div>
+            </div>
+
+            <p>The test uses an <span class="highlight">F-test</span> comparing models with and without variable X. With 3 variables in the system, all 6 directional pairs are tested — forming the causality heatmap below. Significance level: $\alpha = 0.05$.</p>
+        </div>
     </div>
 </div>
 
@@ -70,7 +87,7 @@
 
         {{-- Heatmap --}}
         <div class="rounded-xl p-6 border" style="background-color: var(--color-bg-card); border-color: var(--color-border);">
-            <h3 class="text-xs font-semibold uppercase tracking-wider mb-4" style="color: var(--color-text-muted);">
+            <h3 class="text-xs font-semibold uppercase tracking-wider mb-4" style="color: var(--color-text-muted);" data-i18n="p2.heatmap_title">
                 Causality Heatmap (p-values)
             </h3>
             <div id="heatmap-grid"></div>
@@ -82,16 +99,19 @@
                 <table class="w-full text-sm">
                     <thead>
                         <tr style="background-color: var(--color-bg-input);">
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">Cause → Effect</th>
-                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">F-stat</th>
-                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">p-value</th>
-                            <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">Significant</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);" data-i18n="p2.col.pair">Cause → Effect</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);" data-i18n="p2.col.fstat">F-stat</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);" data-i18n="p2.col.pvalue">p-value</th>
+                            <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);" data-i18n="p2.col.significant">Significant</th>
                         </tr>
                     </thead>
                     <tbody id="granger-tbody"></tbody>
                 </table>
             </div>
         </div>
+
+        {{-- Notation legend --}}
+        <div id="p2-notation-legend" class="mt-6"></div>
     </div>
 </div>
 
@@ -100,14 +120,20 @@
 
 @push('scripts')
 <script type="module">
+    let cachedData = null;
+
     async function load() {
         try {
             const data = await window.dashboardFetch('granger');
+            cachedData = data;
+            document.getElementById('page-title').textContent = window.t('p2.title');
+            document.getElementById('page-subtitle').textContent = window.t('p2.subtitle');
             document.getElementById('granger-loading').classList.add('hidden');
             document.getElementById('granger-content').classList.remove('hidden');
             renderSummary(data);
             renderHeatmap(data);
             renderTable(data);
+            window.renderNotationLegend('p2-notation-legend', { statistics: ['f-stat', 'p-value', 'lag'], significance: true });
         } catch (err) {
             document.getElementById('granger-loading').classList.add('hidden');
             document.getElementById('granger-error').classList.remove('hidden');
@@ -117,9 +143,9 @@
 
     function renderSummary(data) {
         const items = [
-            ['Significant Pairs', `${data.summary?.significant_count ?? '—'}/${data.summary?.total_pairs ?? '—'}`, 'var(--color-accent-blue)'],
-            ['Lag Order', data.lag_selection?.selected_lag ?? '—', 'var(--color-accent-cyan)'],
-            ['Significance Level', data.metadata?.significance_level ?? 0.05, 'var(--color-accent-purple)'],
+            [window.t('p2.sig_pairs'), `${data.summary?.significant_count ?? '—'}/${data.summary?.total_pairs ?? '—'}`, 'var(--color-accent-blue)'],
+            [window.t('p2.lag_order'), data.lag_selection?.selected_lag ?? '—', 'var(--color-accent-cyan)'],
+            [window.t('p2.sig_level'), data.metadata?.significance_level ?? 0.05, 'var(--color-accent-purple)'],
         ];
         document.getElementById('granger-summary').innerHTML = items.map(([label, val, color]) => `
             <div class="rounded-lg px-4 py-3 border" style="background-color: var(--color-bg-card); border-color: var(--color-border);">
@@ -178,12 +204,21 @@
                 <td class="px-4 py-3 text-right tabular-nums" style="color: ${p.significant ? 'var(--color-accent-blue)' : 'var(--color-text-primary)'};">${p.p_value?.toFixed(4) ?? '—'}</td>
                 <td class="px-4 py-3 text-center">
                     ${p.significant
-                        ? '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" style="background-color: rgba(59,130,246,0.15); color: var(--color-accent-blue);">Yes</span>'
-                        : '<span class="text-xs" style="color: var(--color-text-muted);">No</span>'}
+                        ? `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" style="background-color: rgba(59,130,246,0.15); color: var(--color-accent-blue);">${window.t('common.yes')}</span>`
+                        : `<span class="text-xs" style="color: var(--color-text-muted);">${window.t('common.no')}</span>`}
                 </td>
             </tr>
         `).join('');
     }
+
+    window.onLangChange(() => {
+        if (!cachedData) return;
+        document.getElementById('page-title').textContent = window.t('p2.title');
+        document.getElementById('page-subtitle').textContent = window.t('p2.subtitle');
+        renderSummary(cachedData);
+        renderTable(cachedData);
+        window.renderNotationLegend('p2-notation-legend', { statistics: ['f-stat', 'p-value', 'lag'], significance: true });
+    });
 
     load();
 </script>

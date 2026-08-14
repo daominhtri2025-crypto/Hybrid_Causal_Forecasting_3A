@@ -2,8 +2,15 @@ import Chart from 'chart.js/auto';
 import annotationPlugin from 'chartjs-plugin-annotation';
 import 'katex/dist/katex.min.css';
 import renderMathInElement from 'katex/dist/contrib/auto-render.mjs';
+import { t, getLang, setLang, onLangChange, applyLang, renderNotationLegend } from './i18n.js';
 
 Chart.register(annotationPlugin);
+
+window.t = t;
+window.getLang = getLang;
+window.setLang = setLang;
+window.onLangChange = onLangChange;
+window.renderNotationLegend = renderNotationLegend;
 
 Chart.defaults.color = '#94a3b8';
 Chart.defaults.borderColor = '#334155';
@@ -143,5 +150,6 @@ function escapeHtml(str) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    applyLang();
     window.renderMath();
 });

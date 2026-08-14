@@ -7,7 +7,7 @@
 @section('export-buttons')
 <button class="btn-export" data-export="irf-export" onclick="exportSectionPDF('irf-export', 'phase5_irf.pdf')">
     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-    Export PDF
+    <span data-i18n="header.export_pdf">Export PDF</span>
 </button>
 @endsection
 
@@ -22,31 +22,50 @@
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
             <div>
-                <div class="explainer-title">Hàm phản ứng xung (Impulse Response Function)</div>
-                <div class="explainer-subtitle">Khi một biến bị "sốc", các biến khác phản ứng thế nào theo thời gian?</div>
+                <div class="explainer-title">
+                    <span data-lang="vi">Hàm phản ứng xung (Impulse Response Function)</span>
+                    <span data-lang="en" style="display: none;">Impulse Response Functions (IRF)</span>
+                </div>
+                <div class="explainer-subtitle">
+                    <span data-lang="vi">Khi một biến bị "sốc", các biến khác phản ứng thế nào theo thời gian?</span>
+                    <span data-lang="en" style="display: none;">When a variable is shocked, how do the others respond over time?</span>
+                </div>
             </div>
         </div>
         <svg id="explain-irf-icon" class="explainer-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
     </div>
     <div id="explain-irf" class="explainer-body hidden math-content">
-        <p>
-            IRF theo dõi tác động của <span class="highlight">một cú sốc 1 độ lệch chuẩn</span> vào biến $j$
-            lên biến $i$ qua $h$ kỳ (horizons). Sử dụng phân rã Cholesky để trực giao hóa các sốc.
-        </p>
+        <div data-lang="vi">
+            <p>
+                IRF theo dõi tác động của <span class="highlight">một cú sốc 1 độ lệch chuẩn</span> vào biến $j$
+                lên biến $i$ qua $h$ kỳ (horizons). Sử dụng phân rã Cholesky để trực giao hóa các sốc.
+            </p>
 
-        <div class="formula-block">
-            <div class="formula-label">Biểu diễn VMA(∞) — Moving Average</div>
-            $$\mathbf{Y}_t = \boldsymbol{\mu} + \sum_{s=0}^{\infty} \boldsymbol{\Psi}_s \mathbf{u}_{t-s}, \quad \boldsymbol{\Psi}_0 = \mathbf{I}_k$$
+            <div class="formula-block">
+                <div class="formula-label">Biểu diễn VMA(∞) — Moving Average</div>
+                $$\mathbf{Y}_t = \boldsymbol{\mu} + \sum_{s=0}^{\infty} \boldsymbol{\Psi}_s \mathbf{u}_{t-s}, \quad \boldsymbol{\Psi}_0 = \mathbf{I}_k$$
+            </div>
+
+            <p>
+                Phần tử $\Psi_s(i,j)$ chính là phản ứng của biến $i$ sau $s$ kỳ trước cú sốc vào biến $j$.
+            </p>
+            <p>
+                <span class="highlight-orange">Đọc biểu đồ:</span> Đường về 0 nhanh → tác động tạm thời.
+                Đường duy trì khác 0 → tác động kéo dài. Đường âm → phản ứng ngược chiều.
+                Vùng nằm trong đường zero (nét đứt) cho thấy tác động không có ý nghĩa thống kê.
+            </p>
         </div>
+        <div data-lang="en" style="display: none;">
+            <p>IRF tracks the impact of <span class="highlight">a one standard-deviation shock</span> to variable $j$ on variable $i$ over $h$ periods (horizons). Uses Cholesky decomposition to orthogonalize shocks.</p>
 
-        <p>
-            Phần tử $\Psi_s(i,j)$ chính là phản ứng của biến $i$ sau $s$ kỳ trước cú sốc vào biến $j$.
-        </p>
-        <p>
-            <span class="highlight-orange">Đọc biểu đồ:</span> Đường về 0 nhanh → tác động tạm thời.
-            Đường duy trì khác 0 → tác động kéo dài. Đường âm → phản ứng ngược chiều.
-            Vùng nằm trong đường zero (nét đứt) cho thấy tác động không có ý nghĩa thống kê.
-        </p>
+            <div class="formula-block">
+                <div class="formula-label">VMA(∞) Representation — Moving Average</div>
+                $$\mathbf{Y}_t = \boldsymbol{\mu} + \sum_{s=0}^{\infty} \boldsymbol{\Psi}_s \mathbf{u}_{t-s}, \quad \boldsymbol{\Psi}_0 = \mathbf{I}_k$$
+            </div>
+
+            <p>Element $\Psi_s(i,j)$ is the response of variable $i$ after $s$ periods to a shock in variable $j$.</p>
+            <p><span class="highlight-orange">Reading the charts:</span> Quick return to zero → temporary effect. Persistent non-zero → lasting impact. Negative line → inverse response. Bands containing the zero line (dashed) indicate statistically insignificant effects.</p>
+        </div>
     </div>
 </div>
 
@@ -61,6 +80,7 @@
     <div id="irf-content" class="hidden space-y-6">
         <div id="irf-meta" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
         <div id="irf-charts" class="space-y-6"></div>
+        <div id="p5irf-notation-legend" class="mt-6"></div>
     </div>
 </div>
 
@@ -71,14 +91,19 @@
 <script type="module">
     const VS = window.VARIABLE_STYLES;
     const SHOCK_COLORS = ['#3b82f6', '#f97316', '#22c55e', '#a855f7', '#06b6d4'];
+    let cachedData = null;
 
     async function load() {
         try {
             const data = await window.dashboardFetch('irf');
+            cachedData = data;
             document.getElementById('irf-loading').classList.add('hidden');
             document.getElementById('irf-content').classList.remove('hidden');
+            document.getElementById('page-title').textContent = window.t('p5irf.title');
+            document.getElementById('page-subtitle').textContent = window.t('p5irf.subtitle');
             renderMeta(data);
             renderCharts(data);
+            window.renderNotationLegend('p5irf-notation-legend', { statistics: ['ci'], significance: false });
         } catch (err) {
             document.getElementById('irf-loading').classList.add('hidden');
             document.getElementById('irf-error').classList.remove('hidden');
@@ -89,10 +114,10 @@
     function renderMeta(data) {
         const m = data.metadata;
         const items = [
-            ['IRF Periods', m.irf_periods ?? '—'],
-            ['Orthogonalization', m.orthogonalization ?? '—'],
-            ['CI Method', m.ci_method ?? '—'],
-            ['Ordering', (m.cholesky_ordering ?? []).join(' → ')],
+            [window.t('p5irf.lbl.periods'), m.irf_periods ?? '—'],
+            [window.t('p5irf.lbl.orth'), m.orthogonalization ?? '—'],
+            [window.t('p5irf.lbl.ci'), m.ci_method ?? '—'],
+            [window.t('p5irf.lbl.ordering'), (m.cholesky_ordering ?? []).join(' → ')],
         ];
         document.getElementById('irf-meta').innerHTML = items.map(([l, v]) => `
             <div class="rounded-lg px-4 py-3 border" style="background-color: var(--color-bg-card); border-color: var(--color-border);">
@@ -116,7 +141,7 @@
             const canvasId = `irf-chart-${respVar}`;
             wrapper.innerHTML = `
                 <h3 class="text-sm font-semibold mb-4" style="color: var(--color-text-primary);">
-                    Response: ${style.label}
+                    ${window.t('p5irf.response')}: ${style.label}
                 </h3>
                 <div class="chart-container" style="height: 280px;">
                     <canvas id="${canvasId}"></canvas>
@@ -129,7 +154,7 @@
                 const color = SHOCK_COLORS[idx % SHOCK_COLORS.length];
                 const shockStyle = VS[s.shock] ?? { color, label: s.shock };
                 datasets.push({
-                    label: `${shockStyle.label} shock`,
+                    label: `${shockStyle.label} ${window.t('p5irf.shock')}`,
                     data: s.data.irf_values,
                     borderColor: shockStyle.color,
                     backgroundColor: shockStyle.color,
@@ -158,13 +183,21 @@
                         },
                     },
                     scales: {
-                        x: { title: { display: true, text: 'Horizon', color: '#64748b', font: { size: 11 } }, grid: { color: 'rgba(51,65,85,0.5)' } },
-                        y: { title: { display: true, text: 'Response', color: '#64748b', font: { size: 11 } }, grid: { color: 'rgba(51,65,85,0.5)' } },
+                        x: { title: { display: true, text: window.t('p5irf.axis.horizon'), color: '#64748b', font: { size: 11 } }, grid: { color: 'rgba(51,65,85,0.5)' } },
+                        y: { title: { display: true, text: window.t('p5irf.axis.response'), color: '#64748b', font: { size: 11 } }, grid: { color: 'rgba(51,65,85,0.5)' } },
                     },
                 },
             });
         }
     }
+
+    window.onLangChange(() => {
+        if (!cachedData) return;
+        document.getElementById('page-title').textContent = window.t('p5irf.title');
+        document.getElementById('page-subtitle').textContent = window.t('p5irf.subtitle');
+        renderMeta(cachedData);
+        window.renderNotationLegend('p5irf-notation-legend', { statistics: ['ci'], significance: false });
+    });
 
     load();
 </script>

@@ -29,7 +29,8 @@
         {{-- Navigation --}}
         <nav class="flex-1 overflow-y-auto py-4 px-3 scrollbar-thin">
             <p class="mb-2 px-3 text-[10px] font-semibold uppercase tracking-widest"
-               style="color: var(--color-text-muted);">
+               style="color: var(--color-text-muted);"
+               data-i18n="nav.overview">
                 Overview
             </p>
             <ul class="space-y-0.5">
@@ -40,13 +41,14 @@
                        style="color: {{ request()->routeIs('dashboard.summary') ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }};
                               background-color: {{ request()->routeIs('dashboard.summary') ? 'var(--color-bg-card)' : 'transparent' }};">
                         <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
-                        Summary
+                        <span data-i18n="nav.summary">Summary</span>
                     </a>
                 </li>
             </ul>
 
             <p class="mt-6 mb-2 px-3 text-[10px] font-semibold uppercase tracking-widest"
-               style="color: var(--color-text-muted);">
+               style="color: var(--color-text-muted);"
+               data-i18n="nav.causality">
                 Causality Analysis
             </p>
             <ul class="space-y-0.5">
@@ -57,7 +59,7 @@
                        style="color: {{ request()->routeIs('dashboard.stationarity') ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }};
                               background-color: {{ request()->routeIs('dashboard.stationarity') ? 'var(--color-bg-card)' : 'transparent' }};">
                         <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                        Phase 1 — Stationarity
+                        <span data-i18n="nav.phase1">Phase 1 — Stationarity</span>
                     </a>
                 </li>
                 <li>
@@ -67,7 +69,7 @@
                        style="color: {{ request()->routeIs('dashboard.granger') ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }};
                               background-color: {{ request()->routeIs('dashboard.granger') ? 'var(--color-bg-card)' : 'transparent' }};">
                         <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                        Phase 2 — Granger
+                        <span data-i18n="nav.phase2">Phase 2 — Granger</span>
                     </a>
                 </li>
                 <li>
@@ -77,7 +79,7 @@
                        style="color: {{ request()->routeIs('dashboard.cointegration') ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }};
                               background-color: {{ request()->routeIs('dashboard.cointegration') ? 'var(--color-bg-card)' : 'transparent' }};">
                         <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
-                        Phase 3 — Cointegration
+                        <span data-i18n="nav.phase3">Phase 3 — Cointegration</span>
                     </a>
                 </li>
                 <li>
@@ -87,13 +89,14 @@
                        style="color: {{ request()->routeIs('dashboard.toda-yamamoto') ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }};
                               background-color: {{ request()->routeIs('dashboard.toda-yamamoto') ? 'var(--color-bg-card)' : 'transparent' }};">
                         <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        Phase 3b — Toda-Yamamoto
+                        <span data-i18n="nav.phase3b">Phase 3b — Toda-Yamamoto</span>
                     </a>
                 </li>
             </ul>
 
             <p class="mt-6 mb-2 px-3 text-[10px] font-semibold uppercase tracking-widest"
-               style="color: var(--color-text-muted);">
+               style="color: var(--color-text-muted);"
+               data-i18n="nav.forecasting">
                 Forecasting
             </p>
             <ul class="space-y-0.5">
@@ -104,7 +107,7 @@
                        style="color: {{ request()->routeIs('dashboard.forecast') ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }};
                               background-color: {{ request()->routeIs('dashboard.forecast') ? 'var(--color-bg-card)' : 'transparent' }};">
                         <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-                        Phase 4 — Forecast
+                        <span data-i18n="nav.phase4">Phase 4 — Forecast</span>
                     </a>
                 </li>
                 <li>
@@ -114,7 +117,7 @@
                        style="color: {{ request()->routeIs('dashboard.irf') ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }};
                               background-color: {{ request()->routeIs('dashboard.irf') ? 'var(--color-bg-card)' : 'transparent' }};">
                         <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                        Phase 5 — IRF
+                        <span data-i18n="nav.phase5_irf">Phase 5 — IRF</span>
                     </a>
                 </li>
                 <li>
@@ -124,7 +127,7 @@
                        style="color: {{ request()->routeIs('dashboard.fevd') ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }};
                               background-color: {{ request()->routeIs('dashboard.fevd') ? 'var(--color-bg-card)' : 'transparent' }};">
                         <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
-                        Phase 5 — FEVD
+                        <span data-i18n="nav.phase5_fevd">Phase 5 — FEVD</span>
                     </a>
                 </li>
             </ul>
@@ -132,8 +135,9 @@
 
         {{-- Footer --}}
         <div class="border-t px-5 py-3" style="border-color: var(--color-border);">
-            <p class="text-[11px]" style="color: var(--color-text-muted);">
-                Pipeline 3A &middot; VAR on Levels
+            <p class="text-[11px]" style="color: var(--color-text-muted);"
+               data-i18n="nav.footer">
+                Pipeline 3A · VAR on Levels
             </p>
         </div>
     </aside>
@@ -144,10 +148,10 @@
         <header class="sticky top-0 z-20 flex h-16 items-center justify-between border-b px-8"
                 style="background-color: var(--color-bg-primary); border-color: var(--color-border);">
             <div>
-                <h1 class="text-lg font-semibold" style="color: var(--color-text-primary);">
+                <h1 id="page-title" class="text-lg font-semibold" style="color: var(--color-text-primary);">
                     @yield('page-title', 'Dashboard')
                 </h1>
-                <p class="text-xs" style="color: var(--color-text-muted);">
+                <p id="page-subtitle" class="text-xs" style="color: var(--color-text-muted);">
                     @yield('page-subtitle', 'Hybrid Causal Forecasting — 3-Variable System')
                 </p>
             </div>
@@ -155,10 +159,16 @@
                 @hasSection('export-buttons')
                     @yield('export-buttons')
                 @endif
+                <button id="lang-toggle"
+                        onclick="window.setLang(window.getLang() === 'vi' ? 'en' : 'vi')"
+                        class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer"
+                        style="background-color: var(--color-bg-card); color: var(--color-accent-cyan); border: 1px solid var(--color-border);">
+                    EN
+                </button>
                 <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium"
                       style="background-color: var(--color-bg-card); color: var(--color-text-secondary);">
                     <span class="h-1.5 w-1.5 rounded-full" style="background-color: var(--color-kpi-positive);"></span>
-                    READ-ONLY
+                    <span data-i18n="header.read_only">READ-ONLY</span>
                 </span>
             </div>
         </header>
@@ -203,7 +213,7 @@
                                 {{ $step['num'] }}
                             @endif
                         </div>
-                        <span class="step-label">{{ $step['label'] }}</span>
+                        <span class="step-label" data-i18n="stepper.{{ $step['num'] }}">{{ $step['label'] }}</span>
                     </div>
                 @endforeach
             </div>

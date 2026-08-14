@@ -7,7 +7,7 @@
 @section('export-buttons')
 <button class="btn-export" data-export="coint-export" onclick="exportSectionPDF('coint-export', 'phase3_cointegration.pdf')">
     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-    Export PDF
+    <span data-i18n="header.export_pdf">Export PDF</span>
 </button>
 @endsection
 
@@ -22,13 +22,14 @@
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
             <div>
-                <div class="explainer-title">Kiểm định đồng tích hợp Johansen</div>
-                <div class="explainer-subtitle">Các biến có mối quan hệ cân bằng dài hạn không? — Johansen (1991)</div>
+                <div class="explainer-title"><span data-lang="vi">Kiểm định đồng tích hợp Johansen</span><span data-lang="en" style="display: none;">Johansen Cointegration Test</span></div>
+                <div class="explainer-subtitle"><span data-lang="vi">Các biến có mối quan hệ cân bằng dài hạn không? — Johansen (1991)</span><span data-lang="en" style="display: none;">Do variables share a long-run equilibrium? — Johansen (1991)</span></div>
             </div>
         </div>
         <svg id="explain-coint-icon" class="explainer-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
     </div>
     <div id="explain-coint" class="explainer-body hidden math-content">
+        <div data-lang="vi">
         <p>
             Kiểm định Johansen xác định số lượng <span class="highlight">quan hệ đồng tích hợp</span> (cointegration rank $r$)
             giữa các chuỗi thời gian. Nếu $r > 0$, các biến có mối quan hệ cân bằng dài hạn → dùng mô hình VECM.
@@ -58,6 +59,24 @@
             <span class="highlight-orange">Quyết định route:</span> Khi rank $r = k$ (full rank, bằng số biến),
             ma trận $\Pi$ khả nghịch → không có đồng tích hợp thực sự → chọn <span class="highlight">VAR on Levels</span>.
         </p>
+        </div>
+        <div data-lang="en" style="display: none;">
+        <p>The Johansen test determines the number of <span class="highlight">cointegrating relationships</span> (cointegration rank $r$) among time series. If $r > 0$, the variables share a long-run equilibrium → use VECM model. If $r = 0$ or $r = k$ (full rank), use VAR on levels.</p>
+
+        <div class="formula-block">
+            <div class="formula-label">VECM (Vector Error Correction) Form</div>
+            $$\Delta Y_t = \Pi Y_{t-1} + \sum_{i=1}^{p-1} \Gamma_i \Delta Y_{t-i} + \varepsilon_t$$
+        </div>
+
+        <p>Where the matrix $\Pi = \alpha \beta'$ has rank $r$. The <span class="highlight">Trace test</span> sequentially tests $H_0: r \leq r_0$ vs $H_1: r > r_0$, starting from $r_0 = 0$.</p>
+
+        <div class="hypothesis-box">
+            <div class="hyp hyp-h0"><strong>H₀:</strong> Rank $\leq r_0$ — number of cointegrating relationships does not exceed $r_0$</div>
+            <div class="hyp hyp-h1"><strong>H₁:</strong> Rank $> r_0$ — there are additional cointegrating relationships</div>
+        </div>
+
+        <p><span class="highlight-orange">Route decision:</span> When rank $r = k$ (full rank, equals number of variables), matrix $\Pi$ is invertible → no true cointegration → choose <span class="highlight">VAR on Levels</span>.</p>
+        </div>
     </div>
 </div>
 
@@ -78,10 +97,10 @@
                 <table class="w-full text-sm">
                     <thead>
                         <tr style="background-color: var(--color-bg-input);">
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">H0: rank ≤ r</th>
-                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">Trace Stat</th>
-                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">Critical (5%)</th>
-                            <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);">Decision</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);" data-i18n="p3.col.h0">H0: rank ≤ r</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);" data-i18n="p3.col.trace">Trace Stat</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);" data-i18n="p3.col.critical">Critical (5%)</th>
+                            <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider" style="color: var(--color-text-muted);" data-i18n="p3.col.decision">Decision</th>
                         </tr>
                     </thead>
                     <tbody id="coint-tbody"></tbody>
@@ -90,6 +109,7 @@
         </div>
         {{-- Shown when Johansen test was skipped --}}
         <div id="coint-skipped" class="hidden rounded-xl p-5 border" style="background-color: var(--color-bg-card); border-color: var(--color-border);"></div>
+        <div id="p3-notation-legend" class="mt-6"></div>
     </div>
 </div>
 
@@ -98,12 +118,18 @@
 
 @push('scripts')
 <script type="module">
+    let cachedData = null;
+
     async function load() {
         try {
             const data = await window.dashboardFetch('cointegration');
+            cachedData = data;
+            document.getElementById('page-title').textContent = window.t('p3.title');
+            document.getElementById('page-subtitle').textContent = window.t('p3.subtitle');
             document.getElementById('coint-loading').classList.add('hidden');
             document.getElementById('coint-content').classList.remove('hidden');
             render(data);
+            window.renderNotationLegend('p3-notation-legend', { statistics: ['rank', 'p-value'], significance: true });
         } catch (err) {
             document.getElementById('coint-loading').classList.add('hidden');
             document.getElementById('coint-error').classList.remove('hidden');
@@ -126,10 +152,10 @@
                 </div>
                 <div>
                     <h3 class="text-base font-semibold" style="color: var(--color-text-primary);">
-                        Route: ${routeStr}
+                        ${window.t('p3.route_label')}: ${routeStr}
                     </h3>
                     <p class="mt-1 text-sm" style="color: var(--color-text-secondary);">
-                        Cointegration rank r = ${rank} &middot; ${explanation}
+                        ${window.t('p3.coint_rank')} = ${rank} &middot; ${explanation}
                     </p>
                 </div>
             </div>
@@ -140,14 +166,14 @@
             document.getElementById('coint-table-wrap').classList.add('hidden');
             const skipped = document.getElementById('coint-skipped');
             skipped.classList.remove('hidden');
-            const infoText = explanation || 'Pipeline không tạo kết quả kiểm định Johansen cho dataset này.';
+            const infoText = explanation || window.t('p3.skipped_default');
             skipped.innerHTML = `
                 <div class="flex items-start gap-3">
                     <svg class="h-5 w-5 shrink-0 mt-0.5" style="color: var(--color-accent-cyan);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                     <div>
-                        <p class="text-sm font-medium" style="color: var(--color-text-primary);">Johansen test — không có dữ liệu Trace/Max-Eigenvalue</p>
+                        <p class="text-sm font-medium" style="color: var(--color-text-primary);">${window.t('p3.skipped_title')}</p>
                         <p id="coint-skip-reason" class="mt-1 text-xs" style="color: var(--color-text-muted);"></p>
                     </div>
                 </div>
@@ -164,14 +190,22 @@
                         <td class="px-4 py-3 text-right tabular-nums" style="color: var(--color-text-secondary);">${cv95?.toFixed(3) ?? '—'}</td>
                         <td class="px-4 py-3 text-center">
                             ${rejected
-                                ? '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" style="background-color: rgba(239,68,68,0.15); color: var(--color-accent-red);">Reject</span>'
-                                : '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" style="background-color: rgba(34,197,94,0.15); color: var(--color-kpi-positive);">Fail to Reject</span>'}
+                                ? `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" style="background-color: rgba(239,68,68,0.15); color: var(--color-accent-red);">${window.t('common.reject')}</span>`
+                                : `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" style="background-color: rgba(34,197,94,0.15); color: var(--color-kpi-positive);">${window.t('common.fail_to_reject')}</span>`}
                         </td>
                     </tr>
                 `;
             }).join('');
         }
     }
+
+    window.onLangChange(() => {
+        if (!cachedData) return;
+        document.getElementById('page-title').textContent = window.t('p3.title');
+        document.getElementById('page-subtitle').textContent = window.t('p3.subtitle');
+        render(cachedData);
+        window.renderNotationLegend('p3-notation-legend', { statistics: ['rank', 'p-value'], significance: true });
+    });
 
     load();
 </script>
